@@ -1,55 +1,102 @@
-import { useState } from "react";
+import type { Message, ProjectFile, ProjectSnapshot } from "@repo/shared";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 
 type ViewMode = "code" | "preview";
 
-const files = [
-  { name: "src", depth: 0, kind: "folder", active: false },
-  { name: "App.tsx", depth: 1, kind: "file", active: true },
-  { name: "components", depth: 1, kind: "folder", active: false },
-  { name: "Hero.tsx", depth: 2, kind: "file", active: false },
-  { name: "PreviewCard.tsx", depth: 2, kind: "file", active: false },
-  { name: "styles", depth: 1, kind: "folder", active: false },
-  { name: "theme.css", depth: 2, kind: "file", active: false },
-  { name: "package.json", depth: 0, kind: "file", active: false },
-];
+type FileTreeRow =
+  | {
+      depth: number;
+      kind: "folder";
+      path: string;
+      name: string;
+    }
+  | {
+      depth: number;
+      kind: "file";
+      path: string;
+      name: string;
+      file: ProjectFile;
+    };
 
-const codeLines = [
-  "export function LandingPage() {",
-  "  return (",
-  '    <main className="min-h-screen bg-background">',
-  '      <section className="mx-auto grid max-w-5xl gap-8 px-6 py-20">',
-  '        <span className="text-sm font-medium text-accent">',
-  "          Generated preview",
-  "        </span>",
-  '        <h1 className="text-5xl font-semibold tracking-tight">',
-  "          Build launch-ready product pages in minutes.",
-  "        </h1>",
-  '        <button className="w-fit rounded-lg bg-primary px-4 py-2">',
-  "          Start building",
-  "        </button>",
-  "      </section>",
-  "    </main>",
-  "  );",
-  "}",
-];
+async function fetchProjectSnapshot(): Promise<ProjectSnapshot> {
+  const response = await fetch("/api/project");
 
-const messages = [
-  {
-    role: "assistant",
-    text: "I created the first pass of the landing page structure and wired the hero section into the preview.",
-  },
-  {
-    role: "user",
-    text: "Make it feel cleaner and add a stronger call to action.",
-  },
-  {
-    role: "assistant",
-    text: "Updated the spacing, simplified the color system, and added a focused CTA row.",
-  },
-];
+  if (!response.ok) {
+    throw new Error(`Failed to load project: ${response.status}`);
+  }
+
+  return response.json() as Promise<ProjectSnapshot>;
+}
+
+function buildFileTreeRows(files: ProjectFile[]): FileTreeRow[] {
+  const rows: FileTreeRow[] = [];
+  const seenFolders = new Set<string>();
+
+  for (const file of files) {
+    const segments = file.path.split("/").filter(Boolean);
+
+    segments.forEach((segment, index) => {
+      const path = segments.slice(0, index + 1).join("/");
+      const isFile = index === segments.length - 1;
+
+      if (isFile) {
+        rows.push({
+          depth: index,
+          kind: "file",
+          path,
+          name: segment,
+          file,
+        });
+        return;
+      }
+
+      if (!seenFolders.has(path)) {
+        seenFolders.add(path);
+        rows.push({
+          depth: index,
+          kind: "folder",
+          path,
+          name: segment,
+        });
+      }
+    });
+  }
+
+  return rows;
+}
 
 export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("code");
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+
+  const projectQuery = useQuery({
+    queryKey: ["project"],
+    queryFn: fetchProjectSnapshot,
+  });
+
+  const files = projectQuery.data?.files ?? [];
+  const selectedFile = useMemo(
+    () => files.find((file) => file.path === selectedFilePath) ?? files[0],
+    [files, selectedFilePath],
+  );
+
+  useEffect(() => {
+    if (files.length === 0) {
+      setSelectedFilePath(null);
+      return;
+    }
+
+    if (!selectedFilePath || !files.some((file) => file.path === selectedFilePath)) {
+      setSelectedFilePath(files[0]!.path);
+    }
+  }, [files, selectedFilePath]);
+
+  const statusLabel = projectQuery.isLoading
+    ? "Loading"
+    : projectQuery.isError
+      ? "Offline"
+      : "Synced";
 
   return (
     <main className="min-h-dvh bg-[var(--app-bg)] text-[var(--text)]">
@@ -64,7 +111,7 @@ export function App() {
                 Loveable Workspace
               </h1>
               <p className="hidden text-xs text-[var(--muted)] sm:block">
-                app-builder / landing-page
+                app-builder / live project
               </p>
             </div>
           </div>
@@ -88,7 +135,7 @@ export function App() {
 
           <div className="hidden items-center gap-2 text-xs text-[var(--muted)] md:flex">
             <span className="rounded-full border border-[var(--border)] px-2.5 py-1">
-              Synced
+              {statusLabel}
             </span>
             <button
               className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--control)] text-[var(--muted)] transition hover:text-[var(--text)]"
@@ -102,51 +149,97 @@ export function App() {
 
         <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px]">
           <section className="min-h-0 overflow-hidden p-3 sm:p-4">
-            {viewMode === "code" ? <CodeWorkspace /> : <PreviewWorkspace />}
+            {viewMode === "code" ? (
+              <CodeWorkspace
+                error={projectQuery.error}
+                files={files}
+                isError={projectQuery.isError}
+                isLoading={projectQuery.isLoading}
+                onSelectFile={setSelectedFilePath}
+                selectedFile={selectedFile}
+              />
+            ) : (
+              <PreviewWorkspace
+                isLoading={projectQuery.isLoading}
+                previewUrl={projectQuery.data?.previewUrl ?? ""}
+              />
+            )}
           </section>
 
-          <ChatPanel />
+          <ChatPanel
+            isLoading={projectQuery.isLoading}
+            messages={projectQuery.data?.messageHistory ?? []}
+          />
         </div>
       </div>
     </main>
   );
 }
 
-function CodeWorkspace() {
+function CodeWorkspace({
+  error,
+  files,
+  isError,
+  isLoading,
+  onSelectFile,
+  selectedFile,
+}: {
+  error: Error | null;
+  files: ProjectFile[];
+  isError: boolean;
+  isLoading: boolean;
+  onSelectFile: (path: string) => void;
+  selectedFile?: ProjectFile;
+}) {
+  const treeRows = useMemo(() => buildFileTreeRows(files), [files]);
+  const codeLines = selectedFile?.content.split("\n") ?? [];
+
   return (
-    <div className="grid h-full min-h-[680px] grid-cols-1 gap-3 md:grid-cols-[240px_minmax(0,1fr)] lg:min-h-0">
+    <div className="grid h-full min-h-[680px] grid-cols-1 gap-3 md:grid-cols-[280px_minmax(0,1fr)] lg:min-h-0">
       <aside className="flex min-h-0 flex-col rounded-lg border border-[var(--border)] bg-[var(--panel)]">
         <div className="flex h-11 items-center justify-between border-b border-[var(--border)] px-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Files
           </span>
-          <button
-            className="grid size-7 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--control)] hover:text-[var(--text)]"
-            type="button"
-            aria-label="Add file"
-          >
-            +
-          </button>
+          <span className="text-xs text-[var(--muted)]">{files.length}</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-2">
-          {files.map((file) => (
-            <button
-              className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition ${
-                file.active
-                  ? "bg-[var(--selected)] text-[var(--text)]"
-                  : "text-[var(--muted)] hover:bg-[var(--control)] hover:text-[var(--text)]"
-              }`}
-              key={`${file.depth}-${file.name}`}
-              style={{ paddingLeft: `${file.depth * 18 + 8}px` }}
-              type="button"
-            >
-              <span className="w-4 text-center text-xs">
-                {file.kind === "folder" ? ">" : "-"}
-              </span>
-              <span className="truncate">{file.name}</span>
-            </button>
-          ))}
+          {isLoading ? (
+            <EmptyState title="Loading project files" />
+          ) : isError ? (
+            <EmptyState title="Could not load project" detail={error?.message} />
+          ) : treeRows.length === 0 ? (
+            <EmptyState title="No files returned" />
+          ) : (
+            treeRows.map((row) =>
+              row.kind === "folder" ? (
+                <div
+                  className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-[var(--muted)]"
+                  key={`folder-${row.path}`}
+                  style={{ paddingLeft: `${row.depth * 18 + 8}px` }}
+                >
+                  <span className="w-4 text-center text-xs">&gt;</span>
+                  <span className="truncate">{row.name}</span>
+                </div>
+              ) : (
+                <button
+                  className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition ${
+                    selectedFile?.path === row.path
+                      ? "bg-[var(--selected)] text-[var(--text)]"
+                      : "text-[var(--muted)] hover:bg-[var(--control)] hover:text-[var(--text)]"
+                  }`}
+                  key={`file-${row.path}`}
+                  onClick={() => onSelectFile(row.path)}
+                  style={{ paddingLeft: `${row.depth * 18 + 8}px` }}
+                  type="button"
+                >
+                  <span className="w-4 text-center text-xs">-</span>
+                  <span className="truncate">{row.name}</span>
+                </button>
+              ),
+            )
+          )}
         </div>
       </aside>
 
@@ -154,27 +247,48 @@ function CodeWorkspace() {
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--border)] px-3">
           <div className="flex min-w-0 items-center gap-2">
             <span className="size-2 rounded-full bg-[var(--accent)]" />
-            <span className="truncate text-sm font-medium">App.tsx</span>
+            <span className="truncate text-sm font-medium">
+              {selectedFile?.path ?? "No file selected"}
+            </span>
           </div>
-          <span className="text-xs text-[var(--muted)]">React + Tailwind</span>
+          <span className="text-xs text-[var(--muted)]">
+            {selectedFile ? `${codeLines.length} lines` : "Project"}
+          </span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-4 font-mono text-[13px] leading-6">
-          {codeLines.map((line, index) => (
-            <div className="grid grid-cols-[2.5rem_minmax(0,1fr)]" key={line}>
-              <span className="select-none pr-4 text-right text-[var(--line-number)]">
-                {index + 1}
-              </span>
-              <code className="whitespace-pre text-[var(--code)]">{line}</code>
-            </div>
-          ))}
+          {isLoading ? (
+            <EmptyState title="Loading code" />
+          ) : isError ? (
+            <EmptyState title="Unable to read project" detail={error?.message} />
+          ) : !selectedFile ? (
+            <EmptyState title="Select a file to view its code" />
+          ) : (
+            codeLines.map((line, index) => (
+              <div
+                className="grid grid-cols-[2.5rem_minmax(max-content,1fr)]"
+                key={`${selectedFile.path}-${index}`}
+              >
+                <span className="select-none pr-4 text-right text-[var(--line-number)]">
+                  {index + 1}
+                </span>
+                <code className="whitespace-pre text-[var(--code)]">{line}</code>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>
   );
 }
 
-function PreviewWorkspace() {
+function PreviewWorkspace({
+  isLoading,
+  previewUrl,
+}: {
+  isLoading: boolean;
+  previewUrl: string;
+}) {
   return (
     <section className="flex h-full min-h-[680px] flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] lg:min-h-0">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--border)] px-3">
@@ -184,75 +298,47 @@ function PreviewWorkspace() {
           <span className="size-3 rounded-full bg-green-400" />
         </div>
         <span className="truncate rounded-full bg-[var(--control)] px-3 py-1 text-xs text-[var(--muted)]">
-          preview.local
+          {previewUrl || "No preview URL"}
         </span>
         <span className="hidden text-xs text-[var(--muted)] sm:block">
-          1440 x 900
+          Live app
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-[var(--preview-bg)] p-4 sm:p-8">
-        <div className="mx-auto flex min-h-full max-w-5xl flex-col justify-between rounded-lg border border-[var(--preview-border)] bg-[var(--preview-surface)] p-6 shadow-xl shadow-black/5 sm:p-10">
-          <nav className="flex items-center justify-between">
-            <span className="text-sm font-semibold">Northstar</span>
-            <div className="hidden gap-5 text-sm text-[var(--preview-muted)] sm:flex">
-              <span>Product</span>
-              <span>Pricing</span>
-              <span>Docs</span>
-            </div>
-          </nav>
-
-          <div className="grid gap-8 py-14 sm:py-20">
-            <span className="w-fit rounded-full bg-[var(--preview-chip)] px-3 py-1 text-sm font-medium text-[var(--accent)]">
-              Generated in the workspace
-            </span>
-            <div className="max-w-3xl space-y-5">
-              <h2 className="text-4xl font-semibold leading-tight text-[var(--preview-text)] sm:text-6xl">
-                Ship cleaner product pages with an AI design partner.
-              </h2>
-              <p className="max-w-2xl text-lg leading-8 text-[var(--preview-muted)]">
-                Plan, edit, preview, and refine application screens from one
-                focused workspace.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button className="h-11 rounded-lg bg-[var(--accent)] px-5 text-sm font-semibold text-white shadow-lg shadow-teal-500/20">
-                Start building
-              </button>
-              <button className="h-11 rounded-lg border border-[var(--preview-border)] px-5 text-sm font-semibold text-[var(--preview-text)]">
-                View template
-              </button>
-            </div>
+      <div className="min-h-0 flex-1 bg-[var(--preview-bg)] p-3 sm:p-4">
+        {isLoading ? (
+          <div className="grid h-full place-items-center rounded-lg border border-[var(--preview-border)] bg-[var(--preview-surface)]">
+            <EmptyState title="Loading preview" />
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {["Design system", "Live preview", "Code handoff"].map((item) => (
-              <div
-                className="rounded-lg border border-[var(--preview-border)] p-4"
-                key={item}
-              >
-                <p className="text-sm font-semibold text-[var(--preview-text)]">
-                  {item}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[var(--preview-muted)]">
-                  A focused block for validating the generated app experience.
-                </p>
-              </div>
-            ))}
+        ) : previewUrl ? (
+          <iframe
+            className="h-full w-full rounded-lg border border-[var(--preview-border)] bg-white"
+            src={previewUrl}
+            title="Project preview"
+          />
+        ) : (
+          <div className="grid h-full place-items-center rounded-lg border border-[var(--preview-border)] bg-[var(--preview-surface)]">
+            <EmptyState title="No preview URL returned" />
           </div>
-        </div>
+        )}
       </div>
     </section>
   );
 }
 
-function ChatPanel() {
+function ChatPanel({
+  isLoading,
+  messages,
+}: {
+  isLoading: boolean;
+  messages: Message[];
+}) {
   return (
     <aside className="flex min-h-[620px] flex-col border-t border-[var(--border)] bg-[var(--panel)] lg:min-h-0 lg:border-l lg:border-t-0">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
         <div>
           <h2 className="text-sm font-semibold">Assistant</h2>
-          <p className="text-xs text-[var(--muted)]">UI generation session</p>
+          <p className="text-xs text-[var(--muted)]">Project conversation</p>
         </div>
         <span className="rounded-full bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success)]">
           Ready
@@ -260,24 +346,30 @@ function ChatPanel() {
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-auto px-4 py-5">
-        {messages.map((message, index) => (
-          <div
-            className={`flex ${
-              message.role === "user" ? "justify-end" : "justify-start"
-            }`}
-            key={`${message.role}-${index}`}
-          >
+        {isLoading ? (
+          <EmptyState title="Loading messages" />
+        ) : messages.length === 0 ? (
+          <EmptyState title="No conversation yet" detail="Messages from the project API will appear here." />
+        ) : (
+          messages.map((message, index) => (
             <div
-              className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
-                message.role === "user"
-                  ? "bg-[var(--accent)] text-white"
-                  : "border border-[var(--border)] bg-[var(--chat-bubble)] text-[var(--text)]"
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
               }`}
+              key={`${message.role}-${message.createdAt}-${index}`}
             >
-              {message.text}
+              <div
+                className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
+                  message.role === "user"
+                    ? "bg-[var(--accent)] text-white"
+                    : "border border-[var(--border)] bg-[var(--chat-bubble)] text-[var(--text)]"
+                }`}
+              >
+                {message.content}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <form className="border-t border-[var(--border)] p-4">
@@ -291,7 +383,7 @@ function ChatPanel() {
             placeholder="Ask the assistant to change the UI..."
           />
           <div className="flex items-center justify-between gap-3 pt-2">
-            <span className="text-xs text-[var(--muted)]">UI only mock</span>
+            <span className="text-xs text-[var(--muted)]">Input is not wired yet</span>
             <button
               className="h-9 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-white"
               type="button"
@@ -302,6 +394,17 @@ function ChatPanel() {
         </div>
       </form>
     </aside>
+  );
+}
+
+function EmptyState({ detail, title }: { detail?: string; title: string }) {
+  return (
+    <div className="px-3 py-8 text-center">
+      <p className="text-sm font-medium text-[var(--text)]">{title}</p>
+      {detail ? (
+        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{detail}</p>
+      ) : null}
+    </div>
   );
 }
 
