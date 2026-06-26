@@ -1,7 +1,7 @@
+import type { ProjectFile } from "@repo/shared";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ProjectFile } from "../types/projectTypes";
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);

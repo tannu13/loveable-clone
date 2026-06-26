@@ -1,11 +1,22 @@
 import express, { type Request, type Response } from "express";
+import cors from "cors";
 import z from "zod";
 import { validate } from "./middlewares/validate";
 import { Harness } from "./services/harness";
 import { resolveResponse } from "./services/comms";
+import env from "./env";
+import { listProjectFiles } from "./services/projectFiles";
+import type { Message, ProjectSnapshot } from "@repo/shared";
 
+const previewUrl = env.PROJECT_PREVIEW_URL;
+const messageHistory: Message[] = [];
+
+const corsOptions = {
+  origin: env.FRONTEND_URL,
+};
 const app = express();
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/health", (_req: Request, res: Response) => {
@@ -14,12 +25,28 @@ app.get("/health", (_req: Request, res: Response) => {
   });
 });
 
+app.get("/api/project", async (_request, response) => {
+  const files = await listProjectFiles();
+  const ps: ProjectSnapshot = {
+    summary: "",
+    messageHistory,
+    files,
+    updatedAt:
+      messageHistory.length > 0
+        ? messageHistory[messageHistory.length - 1]!.createdAt
+        : "",
+    previewUrl,
+  };
+
+  response.status(200).json(ps);
+});
+
 const ConversationSchema = z.object({
   message: z.string().min(1, "Message is mandatory for the conversation"),
 });
 type TConversationSchema = z.infer<typeof ConversationSchema>;
 app.post(
-  "/conversation",
+  "/api/conversation",
   validate("body", ConversationSchema),
   async (req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -47,7 +74,7 @@ app.post(
   },
 );
 
-app.post("/user-reply", async (req: Request, res: Response) => {
+app.post("/api/user-reply", async (req: Request, res: Response) => {
   const { correlationId, answers } = req.body;
   console.log("correlationId", correlationId);
 

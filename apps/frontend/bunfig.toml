@@ -1,0 +1,4 @@
+[serve.static]
+env = "BUN_PUBLIC_*"
+[serve]
+port = 5173
