@@ -4,18 +4,16 @@ import {
   type Content,
   type Part,
 } from "@google/genai";
-import type { ToolRegistry } from "./ToolRegistry";
-// import type { ToolRegistry } from "./tools";
+import type { ToolRegistry } from "./tools";
 
 export class Agent {
   private ai: GoogleGenAI;
   private history: Content[] = [];
-  private model = "gemini-2.5-pro";
+  private model = "gemma-4-26b-a4b-it";
 
-  constructor(apiKey: string, initialPrompt: string, model: string) {
+  constructor(apiKey: string, initialPrompt: string) {
     this.ai = new GoogleGenAI({ apiKey });
     this.addUserRole([{ text: initialPrompt }]);
-    this.model = model;
   }
 
   getHistory() {

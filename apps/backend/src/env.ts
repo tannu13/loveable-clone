@@ -4,7 +4,7 @@ const EnvSchema = z.object({
   APP_PORT: z.coerce.number().positive().default(3000),
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   APP_STAGE: z.enum(["dev", "prod"]).default("dev"),
-  // GEMINI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1),
 });
 
 type Env = z.infer<typeof EnvSchema>;

@@ -1,6 +1,11 @@
 import express, { type Request, type Response } from "express";
 import z from "zod";
 import { validate } from "./middlewares/validate";
+import { Agent } from "./services/agent";
+import env from "./env";
+import { ToolRegistry } from "./services/tools";
+import { Harness } from "./services/harness";
+import { resolveResponse } from "./services/comms";
 
 const app = express();
 app.use(express.json());
@@ -27,17 +32,32 @@ app.post(
 
     res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
 
-    // When client closes connection, stop sending events
-    req.on("close", () => {
+    const sendResponse = (payload: string) => {
+      res.write(`data: ${payload}\n\n`);
+    };
+
+    const endResponse = () => {
+      res.end();
+    };
+
+    res.on("close", () => {
       res.end();
     });
     const { message } = req.body as TConversationSchema;
-    console.log("message", message);
-    res.status(200).json({
-      message,
-    });
+
+    const harness = new Harness(message, sendResponse, endResponse);
+    await harness.executeTask();
   },
 );
+
+app.post("/user-reply", async (req: Request, res: Response) => {
+  const { correlationId, answers } = req.body;
+  console.log("correlationId", correlationId);
+
+  resolveResponse(correlationId, answers)!;
+
+  res.json({ recorded: true });
+});
 
 export default app;
 export { app };

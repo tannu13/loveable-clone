@@ -1,44 +1,20 @@
 import { Type, type FunctionDeclaration } from "@google/genai";
-import { type Response } from "express";
 import z from "zod";
-
-function getRandomIntInclusive(min: number, max: number) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-export const comms: Map<string, (value: Record<string, unknown>) => void> =
-  new Map();
+import { waitForResponse } from "./comms";
 
 const ReadFileSchema = z.object({
   path: z.string().min(1, "Path cannot be empty"),
 });
-export type TReadFileSchema = z.infer<typeof ReadFileSchema>;
-
-const WriteFileSchema = z.object({
-  path: z.string().min(1, "Path cannot be empty"),
-  content: z.string().min(1, "Content cannot be empty"),
-});
-export type TWriteFileSchema = z.infer<typeof WriteFileSchema>;
-
-const QnASchema = z.object({
-  responseStream: z.record(z.string(), z.any()),
-  questions: z.array(
-    z.object({
-      question: z.string().min(1, "Question statement should not be empty"),
-      type: "select",
-      options: z.array(z.string().min(1, "Option should have text")),
-    }),
-  ),
-});
-export type TQnASchema = z.infer<typeof QnASchema>;
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
   declaration: FunctionDeclaration;
   schema: S;
-  execute: (args: z.infer<S>) => Promise<Record<string, unknown>>;
+  summaryText: (args: z.infer<S>) => string;
+  execute: (
+    args: z.infer<S>,
+    sendResponse: (payload: string) => void,
+  ) => Promise<Record<string, unknown>>;
 }
 
 export const readFileTool: AgentTool<typeof ReadFileSchema> = {
@@ -59,6 +35,7 @@ export const readFileTool: AgentTool<typeof ReadFileSchema> = {
     },
   },
   schema: ReadFileSchema,
+  summaryText: (args) => `Reading file @ ${args.path}`,
   execute: async (args) => {
     console.log(args.path);
     return {
@@ -69,6 +46,10 @@ export const readFileTool: AgentTool<typeof ReadFileSchema> = {
   },
 };
 
+const WriteFileSchema = z.object({
+  path: z.string().min(1, "Path cannot be empty"),
+  content: z.string().min(1, "Content cannot be empty"),
+});
 export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
   name: "writeFile",
   declaration: {
@@ -90,22 +71,31 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
     },
   },
   schema: WriteFileSchema,
+  summaryText: (args) => `Writing to file @ ${args.path}`,
   execute: async (args) => {
     console.log("Write file called", args.path, args.content);
     return {
       fileWritten: args.path,
       content: args.content,
-      success: true,
     };
   },
 };
 
+const QnASchema = z.object({
+  questions: z.array(
+    z.object({
+      question: z.string().min(1, "Question statement should not be empty"),
+      inputType: z.literal("select"),
+      options: z.array(z.string().min(1, "Option should have text")),
+    }),
+  ),
+});
 export const qnaTool: AgentTool<typeof QnASchema> = {
   name: "qnaTool",
   declaration: {
     name: "qnaTool",
     description:
-      "Asks users questions with multiple options provided for them to select one.",
+      "Use this tool to ask questions to the user which will be answered by them. Asks user questions with multiple options provided for them to select one.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -120,7 +110,7 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
                 type: Type.STRING,
                 description: "The text of the question. Must not be empty.",
               },
-              type: {
+              inputType: {
                 type: Type.STRING,
                 enum: ["select"],
                 description:
@@ -135,7 +125,7 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
                 },
               },
             },
-            required: ["question", "type", "options"],
+            required: ["question", "inputType", "options"],
           },
         },
       },
@@ -143,16 +133,16 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
     },
   },
   schema: QnASchema,
-  execute: async (args) => {
+  summaryText(_args) {
+    return `Need more info, asking question(s) to user`;
+  },
+  execute: async (args, sendResponse) => {
     const correlationId = crypto.randomUUID();
-    args.responseStream.write(
-      `data: ${JSON.stringify({ correlationId, questions: args.questions })} \n\n`,
-    );
+    sendResponse(JSON.stringify({ correlationId, questions: args.questions }));
 
-    const a = new Promise<Record<string, unknown>>((res, _rej) => {
-      comms.set(correlationId, res);
-    });
-    return a;
+    const userAnswer = await waitForResponse(correlationId);
+    console.log("userAnswer -- ", userAnswer);
+    return { userAnswer };
   },
 };
 
