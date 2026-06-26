@@ -1,9 +1,6 @@
 import express, { type Request, type Response } from "express";
 import z from "zod";
 import { validate } from "./middlewares/validate";
-import { Agent } from "./services/agent";
-import env from "./env";
-import { ToolRegistry } from "./services/tools";
 import { Harness } from "./services/harness";
 import { resolveResponse } from "./services/comms";
 

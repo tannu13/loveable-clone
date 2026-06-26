@@ -1,10 +1,11 @@
 import { Type, type FunctionDeclaration } from "@google/genai";
 import z from "zod";
 import { waitForResponse } from "./comms";
-
-const ReadFileSchema = z.object({
-  path: z.string().min(1, "Path cannot be empty"),
-});
+import {
+  listProjectFiles,
+  readProjectFile,
+  writeProjectFile,
+} from "./projectFiles";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -17,6 +18,31 @@ interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   ) => Promise<Record<string, unknown>>;
 }
 
+const ListFileSchema = z.object({});
+export const listFileTool: AgentTool<typeof ListFileSchema> = {
+  name: "listFile",
+  declaration: {
+    name: "listFile",
+    description:
+      "This tool will read and give you a list of files and their content in the project which are to be changed",
+    parametersJsonSchema: {
+      type: "object",
+      required: [],
+    },
+  },
+  schema: ListFileSchema,
+  summaryText: () => `Listing files available to the project`,
+  execute: async (args) => {
+    console.log("Listing files args", args);
+
+    const list = await listProjectFiles();
+    return { list };
+  },
+};
+
+const ReadFileSchema = z.object({
+  path: z.string().min(1, "Path cannot be empty"),
+});
 export const readFileTool: AgentTool<typeof ReadFileSchema> = {
   name: "readFile",
   declaration: {
@@ -37,11 +63,10 @@ export const readFileTool: AgentTool<typeof ReadFileSchema> = {
   schema: ReadFileSchema,
   summaryText: (args) => `Reading file @ ${args.path}`,
   execute: async (args) => {
-    console.log(args.path);
+    const content = await readProjectFile(args.path);
     return {
       file: args.path,
-      content:
-        'A rainbow is a stunning optical phenomenon that creates a multicolored arc in the sky. It forms when sunlight enters raindrops, undergoing refraction (bending), reflection off the back of the droplet, and refraction again upon exiting. This splits white light into its core wavelengths.The resulting spectrum features seven distinct colors: red, orange, yellow, green, blue, indigo, and violet, famously remembered by the acronym ROYGBIV. To spot one, the sun must be shining behind you at a low angle while rain falls in front of you. Although they appear as semi-circles on the ground, rainbows are actually complete circular rings, a perspective fully visible from an airplane.While the primary bow features red on the outside and violet inside, a secondary, fainter rainbow with reversed colors occasionally forms due to double internal reflection. Because a rainbow is an optical illusion rather than a physical object, you can never reach its "end". Culturally, it is a universal symbol of hope, peace, and good fortune.',
+      content,
     };
   },
 };
@@ -73,10 +98,10 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
   schema: WriteFileSchema,
   summaryText: (args) => `Writing to file @ ${args.path}`,
   execute: async (args) => {
-    console.log("Write file called", args.path, args.content);
+    await writeProjectFile(args.path, args.content);
     return {
-      fileWritten: args.path,
-      content: args.content,
+      file: args.path,
+      write: true,
     };
   },
 };
@@ -141,7 +166,6 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
     sendResponse(JSON.stringify({ correlationId, questions: args.questions }));
 
     const userAnswer = await waitForResponse(correlationId);
-    console.log("userAnswer -- ", userAnswer);
     return { userAnswer };
   },
 };
@@ -150,7 +174,10 @@ export class ToolRegistry {
   private tools = new Map<string, AgentTool>();
 
   constructor() {
-    this.register(readFileTool).register(writeFileTool).register(qnaTool);
+    this.register(readFileTool)
+      .register(writeFileTool)
+      .register(qnaTool)
+      .register(listFileTool);
   }
 
   register(tool: AgentTool) {

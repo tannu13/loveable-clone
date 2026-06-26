@@ -5,6 +5,7 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   APP_STAGE: z.enum(["dev", "prod"]).default("dev"),
   GEMINI_API_KEY: z.string().min(1),
+  PROJECT_PREVIEW_URL: z.string().startsWith("http"),
 });
 
 type Env = z.infer<typeof EnvSchema>;
