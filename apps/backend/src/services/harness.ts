@@ -1,3 +1,4 @@
+import type { Message } from "@repo/shared";
 import env from "../env";
 import { Agent } from "./agent";
 import {
@@ -16,14 +17,14 @@ export class Harness {
   private toolRegistry: ToolRegistry;
   private maxIterations = 9;
   private hooksRegistry: HooksRegistry;
-  private sendResponse: (payload: string) => void;
+  private sendResponse: (type: Message["type"], payload: unknown) => void;
   private endResponse: () => void;
 
   status = "pending";
 
   constructor(
     initialPrompt: string,
-    sendResponse: (payload: string) => void,
+    sendResponse: (type: Message["type"], payload: unknown) => void,
     endResponse: () => void,
   ) {
     this.sendResponse = sendResponse;
@@ -119,7 +120,7 @@ export class Harness {
 
           try {
             // streaming tool call summary back to user
-            this.sendResponse(tool.summaryText(parseResult.data));
+            this.sendResponse("text", tool.summaryText(parseResult.data));
 
             const result = await tool.execute(
               parseResult.data as any,
@@ -144,7 +145,10 @@ export class Harness {
         console.log("Final Response: ", response.text);
         console.dir(response.usageMetadata, { depth: 5 });
         processing = false;
-        this.sendResponse(JSON.stringify(response.text) || "Agent finished");
+        this.sendResponse(
+          "text",
+          JSON.stringify(response.text) || "Agent finished",
+        );
         this.endResponse();
       }
     }

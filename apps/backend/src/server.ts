@@ -56,14 +56,18 @@ app.post(
 
     res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
 
-    const sendResponse = (payload: string) => {
-      messageHistory.push({
+    function sendResponse(type: "text", payload: string): void;
+    function sendResponse(type: "qna" | "plan", payload: unknown): void;
+    function sendResponse(type: Message["type"], payload: unknown) {
+      const message: Message = {
         role: "assistant",
-        content: payload,
+        type,
+        content: payload as any,
         createdAt: new Date().toISOString(),
-      });
-      res.write(`data: ${payload}\n\n`);
-    };
+      };
+      messageHistory.push(message);
+      res.write(`data: ${JSON.stringify(message)}\n\n`);
+    }
 
     const endResponse = () => {
       res.end();
@@ -75,6 +79,7 @@ app.post(
     const { message } = req.body as TConversationSchema;
     messageHistory.push({
       role: "user",
+      type: "text",
       content: message,
       createdAt: new Date().toISOString(),
     });

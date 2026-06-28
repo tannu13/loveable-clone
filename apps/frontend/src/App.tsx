@@ -1,7 +1,12 @@
-import type { Message, ProjectFile, ProjectSnapshot } from "@repo/shared";
+import {
+  QnASchema,
+  QnASchemaWithCorrelationId,
+  type Message,
+  type ProjectFile,
+  type ProjectSnapshot,
+} from "@repo/shared";
 import { useQuery } from "@tanstack/react-query";
 import {
-  type FormEvent,
   type SubmitEventHandler,
   useCallback,
   useEffect,
@@ -10,6 +15,7 @@ import {
   useState,
 } from "react";
 import { useConversationStream } from "./hooks/useConversationStream";
+import z from "zod";
 
 type ViewMode = "code" | "preview";
 
@@ -439,22 +445,10 @@ function ChatPanel({
           />
         ) : (
           messages.map((message, index) => (
-            <div
-              className={`flex ${
-                message.role === "user" ? "justify-end" : "justify-start"
-              }`}
+            <RenderMessage
               key={`${message.role}-${message.createdAt}-${index}`}
-            >
-              <div
-                className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
-                  message.role === "user"
-                    ? "bg-(--accent) text-white"
-                    : "border border-(--border) bg-(--chat-bubble) text-(--text)"
-                }`}
-              >
-                {message.content}
-              </div>
-            </div>
+              message={message}
+            />
           ))
         )}
         <div ref={messagesEndRef} />
@@ -502,6 +496,65 @@ function EmptyState({ detail, title }: { detail?: string; title: string }) {
       {detail ? (
         <p className="mt-2 text-xs leading-5 text-(--muted)">{detail}</p>
       ) : null}
+    </div>
+  );
+}
+
+function RenderMessage({ message }: { message: Message }) {
+  if (message.type !== "text") {
+    return <RenderQnAMessage message={message} />;
+  }
+  return (
+    <div
+      className={`flex ${
+        message.role === "user" ? "justify-end" : "justify-start"
+      }`}
+    >
+      <div
+        className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
+          message.role === "user"
+            ? "bg-(--accent) text-white"
+            : "border border-(--border) bg-(--chat-bubble) text-(--text)"
+        }`}
+      >
+        {message.content}
+      </div>
+    </div>
+  );
+}
+function RenderQnAMessage({ message }: { message: Message }) {
+  const payload = QnASchemaWithCorrelationId.safeParse(message.content);
+  if (!payload.success) {
+    return (
+      <div className={`flex justify-start bg-red-400`}>
+        Invalid Question Format!!
+      </div>
+    );
+  }
+  const content = payload.data;
+  return (
+    <div className={`flex justify-start`}>
+      <div
+        className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
+          message.role === "user"
+            ? "bg-(--accent) text-white"
+            : "border border-(--border) bg-(--chat-bubble) text-(--text)"
+        }`}
+      >
+        {content.questions.map((q) => (
+          <div className="flex flex-col">
+            <div className="">{q.question}</div>
+            <div className="flex flex-col gap-1">
+              {q.options.map((o, oidx) => (
+                <label htmlFor={`${oidx}`}>
+                  <input type="radio" value={o} />
+                  <span>{o}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

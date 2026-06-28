@@ -14,6 +14,7 @@ type ConversationStreamState = {
 function createMessage(role: Message["role"], content: string): Message {
   return {
     role,
+    type: "text",
     content,
     createdAt: new Date().toISOString(),
   };
@@ -55,9 +56,17 @@ function isConnectionAck(payload: string): boolean {
   }
 }
 
+function parseAsJsonOrThrow(str: string) {
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    throw new Error(`Unable to parse ${str}`);
+  }
+}
+
 async function readEventStream(
   response: Response,
-  onMessage: (message: string) => void,
+  onMessage: (message: Message) => void,
 ): Promise<void> {
   const reader = response.body?.getReader();
 
@@ -81,10 +90,10 @@ async function readEventStream(
     buffer = events.pop() ?? "";
 
     for (const event of events) {
-      const payload = parseSseEvent(event);
+      let payload = parseSseEvent(event);
 
       if (payload && !isConnectionAck(payload)) {
-        onMessage(payload);
+        onMessage(parseAsJsonOrThrow(payload));
       }
     }
   }
@@ -95,7 +104,7 @@ async function readEventStream(
     const payload = parseSseEvent(buffer);
 
     if (payload && !isConnectionAck(payload)) {
-      onMessage(payload);
+      onMessage(parseAsJsonOrThrow(payload));
     }
   }
 }
@@ -141,13 +150,10 @@ export function useConversationStream() {
           throw new Error(`Conversation failed: ${response.status}`);
         }
 
-        await readEventStream(response, (content) => {
+        await readEventStream(response, (message) => {
           setState((current) => ({
             ...current,
-            streamedMessages: [
-              ...current.streamedMessages,
-              createMessage("assistant", content),
-            ],
+            streamedMessages: [...current.streamedMessages, message],
           }));
         });
 

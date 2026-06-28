@@ -6,6 +6,7 @@ import {
   readProjectFile,
   writeProjectFile,
 } from "./projectFiles";
+import { QnASchema, type Message } from "@repo/shared";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -14,7 +15,7 @@ interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   summaryText: (args: z.infer<S>) => string;
   execute: (
     args: z.infer<S>,
-    sendResponse: (payload: string) => void,
+    sendResponse: (type: Message["type"], payload: unknown) => void,
   ) => Promise<Record<string, unknown>>;
 }
 
@@ -106,15 +107,6 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
   },
 };
 
-const QnASchema = z.object({
-  questions: z.array(
-    z.object({
-      question: z.string().min(1, "Question statement should not be empty"),
-      inputType: z.literal("select"),
-      options: z.array(z.string().min(1, "Option should have text")),
-    }),
-  ),
-});
 export const qnaTool: AgentTool<typeof QnASchema> = {
   name: "qnaTool",
   declaration: {
@@ -163,7 +155,7 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
   },
   execute: async (args, sendResponse) => {
     const correlationId = crypto.randomUUID();
-    sendResponse(JSON.stringify({ correlationId, questions: args.questions }));
+    sendResponse("qna", { correlationId, questions: args.questions });
 
     const userAnswer = await waitForResponse(correlationId);
     return { userAnswer };
