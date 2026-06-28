@@ -87,7 +87,10 @@ export function App() {
       return;
     }
 
-    if (!selectedFilePath || !files.some((file) => file.path === selectedFilePath)) {
+    if (
+      !selectedFilePath ||
+      !files.some((file) => file.path === selectedFilePath)
+    ) {
       setSelectedFilePath(files[0]!.path);
     }
   }, [files, selectedFilePath]);
@@ -99,30 +102,30 @@ export function App() {
       : "Synced";
 
   return (
-    <main className="min-h-dvh bg-[var(--app-bg)] text-[var(--text)]">
+    <main className="min-h-dvh bg-(--app-bg) text-(--text)">
       <div className="flex min-h-dvh flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--panel)] px-3 sm:px-5">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) bg-(--panel) px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)] text-sm font-bold text-white">
+            <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-(--accent) text-sm font-bold text-white">
               L
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-5">
                 Loveable Workspace
               </h1>
-              <p className="hidden text-xs text-[var(--muted)] sm:block">
+              <p className="hidden text-xs text-(--muted) sm:block">
                 app-builder / live project
               </p>
             </div>
           </div>
 
-          <div className="grid h-9 grid-cols-2 rounded-lg border border-[var(--border)] bg-[var(--control)] p-1 text-sm">
+          <div className="grid h-9 grid-cols-2 rounded-lg border border-(--border) bg-(--control) p-1 text-sm">
             {(["code", "preview"] as const).map((mode) => (
               <button
                 className={`h-7 min-w-20 rounded-md px-3 font-medium transition ${
                   viewMode === mode
-                    ? "bg-[var(--control-active)] text-[var(--text)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--text)]"
+                    ? "bg-(--control-active) text-(--text) shadow-sm"
+                    : "text-(--muted) hover:text-(--text)"
                 }`}
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -133,12 +136,12 @@ export function App() {
             ))}
           </div>
 
-          <div className="hidden items-center gap-2 text-xs text-[var(--muted)] md:flex">
-            <span className="rounded-full border border-[var(--border)] px-2.5 py-1">
+          <div className="hidden items-center gap-2 text-xs text-(--muted) md:flex">
+            <span className="rounded-full border border-(--border) px-2.5 py-1">
               {statusLabel}
             </span>
             <button
-              className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--control)] text-[var(--muted)] transition hover:text-[var(--text)]"
+              className="grid size-8 place-items-center rounded-lg border border-(--border) bg-(--control) text-(--muted) transition hover:text-(--text)"
               type="button"
               aria-label="Open settings"
             >
@@ -195,27 +198,30 @@ function CodeWorkspace({
   const codeLines = selectedFile?.content.split("\n") ?? [];
 
   return (
-    <div className="grid h-full min-h-[680px] grid-cols-1 gap-3 md:grid-cols-[280px_minmax(0,1fr)] lg:min-h-0">
-      <aside className="flex min-h-0 flex-col rounded-lg border border-[var(--border)] bg-[var(--panel)]">
-        <div className="flex h-11 items-center justify-between border-b border-[var(--border)] px-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+    <div className="grid h-full min-h-170 grid-cols-1 gap-3 md:grid-cols-[280px_minmax(0,1fr)] lg:min-h-0">
+      <aside className="flex min-h-0 flex-col rounded-lg border border-(--border) bg-(--panel)">
+        <div className="flex h-11 items-center justify-between border-b border-(--border) px-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-(--muted)">
             Files
           </span>
-          <span className="text-xs text-[var(--muted)]">{files.length}</span>
+          <span className="text-xs text-(--muted)">{files.length}</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-2">
           {isLoading ? (
             <EmptyState title="Loading project files" />
           ) : isError ? (
-            <EmptyState title="Could not load project" detail={error?.message} />
+            <EmptyState
+              title="Could not load project"
+              detail={error?.message}
+            />
           ) : treeRows.length === 0 ? (
             <EmptyState title="No files returned" />
           ) : (
             treeRows.map((row) =>
               row.kind === "folder" ? (
                 <div
-                  className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-[var(--muted)]"
+                  className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-(--muted)"
                   key={`folder-${row.path}`}
                   style={{ paddingLeft: `${row.depth * 18 + 8}px` }}
                 >
@@ -226,8 +232,8 @@ function CodeWorkspace({
                 <button
                   className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition ${
                     selectedFile?.path === row.path
-                      ? "bg-[var(--selected)] text-[var(--text)]"
-                      : "text-[var(--muted)] hover:bg-[var(--control)] hover:text-[var(--text)]"
+                      ? "bg-(--selected) text-(--text)"
+                      : "text-(--muted) hover:bg-(--control) hover:text-(--text)"
                   }`}
                   key={`file-${row.path}`}
                   onClick={() => onSelectFile(row.path)}
@@ -243,15 +249,15 @@ function CodeWorkspace({
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-col rounded-lg border border-[var(--border)] bg-[var(--editor)]">
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--border)] px-3">
+      <section className="flex min-h-0 flex-col rounded-lg border border-(--border) bg-(--editor)">
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-(--border) px-3">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="size-2 rounded-full bg-[var(--accent)]" />
+            <span className="size-2 rounded-full bg-(--accent)" />
             <span className="truncate text-sm font-medium">
               {selectedFile?.path ?? "No file selected"}
             </span>
           </div>
-          <span className="text-xs text-[var(--muted)]">
+          <span className="text-xs text-(--muted)">
             {selectedFile ? `${codeLines.length} lines` : "Project"}
           </span>
         </div>
@@ -260,7 +266,10 @@ function CodeWorkspace({
           {isLoading ? (
             <EmptyState title="Loading code" />
           ) : isError ? (
-            <EmptyState title="Unable to read project" detail={error?.message} />
+            <EmptyState
+              title="Unable to read project"
+              detail={error?.message}
+            />
           ) : !selectedFile ? (
             <EmptyState title="Select a file to view its code" />
           ) : (
@@ -269,10 +278,10 @@ function CodeWorkspace({
                 className="grid grid-cols-[2.5rem_minmax(max-content,1fr)]"
                 key={`${selectedFile.path}-${index}`}
               >
-                <span className="select-none pr-4 text-right text-[var(--line-number)]">
+                <span className="select-none pr-4 text-right text-(--line-number)">
                   {index + 1}
                 </span>
-                <code className="whitespace-pre text-[var(--code)]">{line}</code>
+                <code className="whitespace-pre text-(--code)">{line}</code>
               </div>
             ))
           )}
@@ -290,34 +299,32 @@ function PreviewWorkspace({
   previewUrl: string;
 }) {
   return (
-    <section className="flex h-full min-h-[680px] flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] lg:min-h-0">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--border)] px-3">
+    <section className="flex h-full min-h-170 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel) lg:min-h-0">
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-(--border) px-3">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full bg-red-400" />
           <span className="size-3 rounded-full bg-yellow-400" />
           <span className="size-3 rounded-full bg-green-400" />
         </div>
-        <span className="truncate rounded-full bg-[var(--control)] px-3 py-1 text-xs text-[var(--muted)]">
+        <span className="truncate rounded-full bg-(--control) px-3 py-1 text-xs text-(--muted)">
           {previewUrl || "No preview URL"}
         </span>
-        <span className="hidden text-xs text-[var(--muted)] sm:block">
-          Live app
-        </span>
+        <span className="hidden text-xs text-(--muted) sm:block">Live app</span>
       </div>
 
-      <div className="min-h-0 flex-1 bg-[var(--preview-bg)] p-3 sm:p-4">
+      <div className="min-h-0 flex-1 bg-(--preview-bg) p-3 sm:p-4">
         {isLoading ? (
-          <div className="grid h-full place-items-center rounded-lg border border-[var(--preview-border)] bg-[var(--preview-surface)]">
+          <div className="grid h-full place-items-center rounded-lg border border-(--preview-border) bg-(--preview-surface)">
             <EmptyState title="Loading preview" />
           </div>
         ) : previewUrl ? (
           <iframe
-            className="h-full w-full rounded-lg border border-[var(--preview-border)] bg-white"
+            className="h-full w-full rounded-lg border border-(--preview-border) bg-white"
             src={previewUrl}
             title="Project preview"
           />
         ) : (
-          <div className="grid h-full place-items-center rounded-lg border border-[var(--preview-border)] bg-[var(--preview-surface)]">
+          <div className="grid h-full place-items-center rounded-lg border border-(--preview-border) bg-(--preview-surface)">
             <EmptyState title="No preview URL returned" />
           </div>
         )}
@@ -334,13 +341,13 @@ function ChatPanel({
   messages: Message[];
 }) {
   return (
-    <aside className="flex min-h-[620px] flex-col border-t border-[var(--border)] bg-[var(--panel)] lg:min-h-0 lg:border-l lg:border-t-0">
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
+    <aside className="flex min-h-155 flex-col border-t border-(--border) bg-(--panel) lg:min-h-0 lg:border-l lg:border-t-0">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) px-4">
         <div>
           <h2 className="text-sm font-semibold">Assistant</h2>
-          <p className="text-xs text-[var(--muted)]">Project conversation</p>
+          <p className="text-xs text-(--muted)">Project conversation</p>
         </div>
-        <span className="rounded-full bg-[var(--success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--success)]">
+        <span className="rounded-full bg-(--success-soft) px-2.5 py-1 text-xs font-medium text-(--success)">
           Ready
         </span>
       </div>
@@ -349,7 +356,10 @@ function ChatPanel({
         {isLoading ? (
           <EmptyState title="Loading messages" />
         ) : messages.length === 0 ? (
-          <EmptyState title="No conversation yet" detail="Messages from the project API will appear here." />
+          <EmptyState
+            title="No conversation yet"
+            detail="Messages from the project API will appear here."
+          />
         ) : (
           messages.map((message, index) => (
             <div
@@ -361,8 +371,8 @@ function ChatPanel({
               <div
                 className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
                   message.role === "user"
-                    ? "bg-[var(--accent)] text-white"
-                    : "border border-[var(--border)] bg-[var(--chat-bubble)] text-[var(--text)]"
+                    ? "bg-(--accent) text-white"
+                    : "border border-(--border) bg-(--chat-bubble) text-(--text)"
                 }`}
               >
                 {message.content}
@@ -372,20 +382,22 @@ function ChatPanel({
         )}
       </div>
 
-      <form className="border-t border-[var(--border)] p-4">
+      <form className="border-t border-(--border) p-4">
         <label className="sr-only" htmlFor="prompt">
           Message
         </label>
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--control)] p-2 focus-within:border-[var(--accent)]">
+        <div className="rounded-lg border border-(--border) bg-(--control) p-2 focus-within:border-(--accent)">
           <textarea
-            className="h-24 w-full resize-none bg-transparent px-2 py-1 text-sm leading-6 text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+            className="h-24 w-full resize-none bg-transparent px-2 py-1 text-sm leading-6 text-(--text) outline-none placeholder:text-(--muted)"
             id="prompt"
             placeholder="Ask the assistant to change the UI..."
           />
           <div className="flex items-center justify-between gap-3 pt-2">
-            <span className="text-xs text-[var(--muted)]">Input is not wired yet</span>
+            <span className="text-xs text-(--muted)">
+              Input is not wired yet
+            </span>
             <button
-              className="h-9 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-white"
+              className="h-9 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white"
               type="button"
             >
               Send
@@ -400,9 +412,9 @@ function ChatPanel({
 function EmptyState({ detail, title }: { detail?: string; title: string }) {
   return (
     <div className="px-3 py-8 text-center">
-      <p className="text-sm font-medium text-[var(--text)]">{title}</p>
+      <p className="text-sm font-medium text-(--text)">{title}</p>
       {detail ? (
-        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{detail}</p>
+        <p className="mt-2 text-xs leading-5 text-(--muted)">{detail}</p>
       ) : null}
     </div>
   );

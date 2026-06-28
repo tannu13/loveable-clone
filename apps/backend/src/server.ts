@@ -57,6 +57,11 @@ app.post(
     res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
 
     const sendResponse = (payload: string) => {
+      messageHistory.push({
+        role: "assistant",
+        content: payload,
+        createdAt: new Date().toISOString(),
+      });
       res.write(`data: ${payload}\n\n`);
     };
 
@@ -68,6 +73,11 @@ app.post(
       res.end();
     });
     const { message } = req.body as TConversationSchema;
+    messageHistory.push({
+      role: "user",
+      content: message,
+      createdAt: new Date().toISOString(),
+    });
 
     const harness = new Harness(message, sendResponse, endResponse);
     await harness.executeTask();
