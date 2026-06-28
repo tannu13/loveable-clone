@@ -1,6 +1,15 @@
 import type { Message, ProjectFile, ProjectSnapshot } from "@repo/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type SubmitEventHandler,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useConversationStream } from "./hooks/useConversationStream";
 
 type ViewMode = "code" | "preview";
 
@@ -69,11 +78,13 @@ function buildFileTreeRows(files: ProjectFile[]): FileTreeRow[] {
 export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("code");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
 
   const projectQuery = useQuery({
     queryKey: ["project"],
     queryFn: fetchProjectSnapshot,
   });
+  const conversationStream = useConversationStream();
 
   const files = projectQuery.data?.files ?? [];
   const selectedFile = useMemo(
@@ -95,11 +106,43 @@ export function App() {
     }
   }, [files, selectedFilePath]);
 
-  const statusLabel = projectQuery.isLoading
-    ? "Loading"
-    : projectQuery.isError
-      ? "Offline"
-      : "Synced";
+  const statusLabel = (() => {
+    if (conversationStream.isStreaming) {
+      return "Working";
+    }
+
+    if (projectQuery.isLoading) {
+      return "Loading";
+    }
+
+    if (projectQuery.isError) {
+      return "Offline";
+    }
+
+    return "Synced";
+  })();
+
+  const displayedMessages = useMemo(
+    () => [
+      ...(projectQuery.data?.messageHistory ?? []),
+      ...conversationStream.streamedMessages,
+    ],
+    [conversationStream.streamedMessages, projectQuery.data?.messageHistory],
+  );
+
+  const refreshProject = useCallback(async () => {
+    await projectQuery.refetch();
+    setPreviewReloadKey((currentKey) => currentKey + 1);
+  }, [projectQuery]);
+
+  const handleSendMessage = useCallback(
+    (message: string) => {
+      void conversationStream.sendMessage(message, {
+        onComplete: refreshProject,
+      });
+    },
+    [conversationStream, refreshProject],
+  );
 
   return (
     <main className="min-h-dvh bg-(--app-bg) text-(--text)">
@@ -165,13 +208,17 @@ export function App() {
               <PreviewWorkspace
                 isLoading={projectQuery.isLoading}
                 previewUrl={projectQuery.data?.previewUrl ?? ""}
+                reloadKey={previewReloadKey}
               />
             )}
           </section>
 
           <ChatPanel
+            error={conversationStream.error}
             isLoading={projectQuery.isLoading}
-            messages={projectQuery.data?.messageHistory ?? []}
+            isStreaming={conversationStream.isStreaming}
+            messages={displayedMessages}
+            onSendMessage={handleSendMessage}
           />
         </div>
       </div>
@@ -294,9 +341,11 @@ function CodeWorkspace({
 function PreviewWorkspace({
   isLoading,
   previewUrl,
+  reloadKey,
 }: {
   isLoading: boolean;
   previewUrl: string;
+  reloadKey: number;
 }) {
   return (
     <section className="flex h-full min-h-170 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel) lg:min-h-0">
@@ -320,6 +369,7 @@ function PreviewWorkspace({
         ) : previewUrl ? (
           <iframe
             className="h-full w-full rounded-lg border border-(--preview-border) bg-white"
+            key={`${previewUrl}-${reloadKey}`}
             src={previewUrl}
             title="Project preview"
           />
@@ -334,12 +384,39 @@ function PreviewWorkspace({
 }
 
 function ChatPanel({
+  error,
   isLoading,
+  isStreaming,
   messages,
+  onSendMessage,
 }: {
+  error: Error | null;
   isLoading: boolean;
+  isStreaming: boolean;
   messages: Message[];
+  onSendMessage: (message: string) => void;
 }) {
+  const [prompt, setPrompt] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const canSend = prompt.trim().length > 0 && !isStreaming;
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [isStreaming, messages.length]);
+
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
+    event.preventDefault();
+
+    const message = prompt.trim();
+
+    if (!message || isStreaming) {
+      return;
+    }
+
+    setPrompt("");
+    onSendMessage(message);
+  };
+
   return (
     <aside className="flex min-h-155 flex-col border-t border-(--border) bg-(--panel) lg:min-h-0 lg:border-l lg:border-t-0">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) px-4">
@@ -348,7 +425,7 @@ function ChatPanel({
           <p className="text-xs text-(--muted)">Project conversation</p>
         </div>
         <span className="rounded-full bg-(--success-soft) px-2.5 py-1 text-xs font-medium text-(--success)">
-          Ready
+          {isStreaming ? "Working" : "Ready"}
         </span>
       </div>
 
@@ -380,27 +457,36 @@ function ChatPanel({
             </div>
           ))
         )}
+        <div ref={messagesEndRef} />
       </div>
 
-      <form className="border-t border-(--border) p-4">
+      <form className="border-t border-(--border) p-4" onSubmit={handleSubmit}>
         <label className="sr-only" htmlFor="prompt">
           Message
         </label>
         <div className="rounded-lg border border-(--border) bg-(--control) p-2 focus-within:border-(--accent)">
           <textarea
             className="h-24 w-full resize-none bg-transparent px-2 py-1 text-sm leading-6 text-(--text) outline-none placeholder:text-(--muted)"
+            disabled={isStreaming}
             id="prompt"
+            onChange={(event) => setPrompt(event.target.value)}
             placeholder="Ask the assistant to change the UI..."
+            value={prompt}
           />
           <div className="flex items-center justify-between gap-3 pt-2">
-            <span className="text-xs text-(--muted)">
-              Input is not wired yet
+            <span className="min-w-0 truncate text-xs text-(--muted)">
+              {error
+                ? error.message
+                : isStreaming
+                  ? "Streaming response..."
+                  : "Ready to send"}
             </span>
             <button
-              className="h-9 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white"
-              type="button"
+              className="h-9 rounded-lg bg-(--accent) px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={!canSend}
+              type="submit"
             >
-              Send
+              {isStreaming ? "Sending" : "Send"}
             </button>
           </div>
         </div>
