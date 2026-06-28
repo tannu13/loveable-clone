@@ -1,10 +1,4 @@
-import {
-  QnASchema,
-  QnASchemaWithCorrelationId,
-  type Message,
-  type ProjectFile,
-  type ProjectSnapshot,
-} from "@repo/shared";
+import type { Message, ProjectFile, ProjectSnapshot } from "@repo/shared";
 import { useQuery } from "@tanstack/react-query";
 import {
   type SubmitEventHandler,
@@ -14,8 +8,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { QnAMessage } from "./components/QnAMessage";
 import { useConversationStream } from "./hooks/useConversationStream";
-import z from "zod";
 
 type ViewMode = "code" | "preview";
 
@@ -151,8 +145,8 @@ export function App() {
   );
 
   return (
-    <main className="min-h-dvh bg-(--app-bg) text-(--text)">
-      <div className="flex min-h-dvh flex-col">
+    <main className="h-dvh overflow-hidden bg-(--app-bg) text-(--text)">
+      <div className="flex h-full min-h-0 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) bg-(--panel) px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-(--accent) text-sm font-bold text-white">
@@ -199,7 +193,7 @@ export function App() {
           </div>
         </header>
 
-        <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,42dvh)] overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px] lg:grid-rows-1">
           <section className="min-h-0 overflow-hidden p-3 sm:p-4">
             {viewMode === "code" ? (
               <CodeWorkspace
@@ -251,7 +245,7 @@ function CodeWorkspace({
   const codeLines = selectedFile?.content.split("\n") ?? [];
 
   return (
-    <div className="grid h-full min-h-170 grid-cols-1 gap-3 md:grid-cols-[280px_minmax(0,1fr)] lg:min-h-0">
+    <div className="grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="flex min-h-0 flex-col rounded-lg border border-(--border) bg-(--panel)">
         <div className="flex h-11 items-center justify-between border-b border-(--border) px-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-(--muted)">
@@ -354,7 +348,7 @@ function PreviewWorkspace({
   reloadKey: number;
 }) {
   return (
-    <section className="flex h-full min-h-170 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel) lg:min-h-0">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-(--border) bg-(--panel)">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-(--border) px-3">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full bg-red-400" />
@@ -424,7 +418,7 @@ function ChatPanel({
   };
 
   return (
-    <aside className="flex min-h-155 flex-col border-t border-(--border) bg-(--panel) lg:min-h-0 lg:border-l lg:border-t-0">
+    <aside className="flex min-h-0 flex-col overflow-hidden border-t border-(--border) bg-(--panel) lg:border-l lg:border-t-0">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) px-4">
         <div>
           <h2 className="text-sm font-semibold">Assistant</h2>
@@ -501,9 +495,15 @@ function EmptyState({ detail, title }: { detail?: string; title: string }) {
 }
 
 function RenderMessage({ message }: { message: Message }) {
-  if (message.type !== "text") {
-    return <RenderQnAMessage message={message} />;
+  if (message.type === "qna") {
+    return <QnAMessage content={message.content} />;
   }
+
+  const content =
+    typeof message.content === "string"
+      ? message.content
+      : JSON.stringify(message.content, null, 2);
+
   return (
     <div
       className={`flex ${
@@ -517,43 +517,7 @@ function RenderMessage({ message }: { message: Message }) {
             : "border border-(--border) bg-(--chat-bubble) text-(--text)"
         }`}
       >
-        {message.content}
-      </div>
-    </div>
-  );
-}
-function RenderQnAMessage({ message }: { message: Message }) {
-  const payload = QnASchemaWithCorrelationId.safeParse(message.content);
-  if (!payload.success) {
-    return (
-      <div className={`flex justify-start bg-red-400`}>
-        Invalid Question Format!!
-      </div>
-    );
-  }
-  const content = payload.data;
-  return (
-    <div className={`flex justify-start`}>
-      <div
-        className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-6 ${
-          message.role === "user"
-            ? "bg-(--accent) text-white"
-            : "border border-(--border) bg-(--chat-bubble) text-(--text)"
-        }`}
-      >
-        {content.questions.map((q) => (
-          <div className="flex flex-col">
-            <div className="">{q.question}</div>
-            <div className="flex flex-col gap-1">
-              {q.options.map((o, oidx) => (
-                <label htmlFor={`${oidx}`}>
-                  <input type="radio" value={o} />
-                  <span>{o}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
+        {content}
       </div>
     </div>
   );
