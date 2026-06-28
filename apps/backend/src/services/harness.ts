@@ -1,4 +1,4 @@
-import type { Message } from "@repo/shared";
+import type { SendResponse } from "@repo/shared";
 import env from "../env";
 import { Agent } from "./agent";
 import {
@@ -17,14 +17,14 @@ export class Harness {
   private toolRegistry: ToolRegistry;
   private maxIterations = 9;
   private hooksRegistry: HooksRegistry;
-  private sendResponse: (type: Message["type"], payload: unknown) => void;
+  private sendResponse: SendResponse;
   private endResponse: () => void;
 
   status = "pending";
 
   constructor(
     initialPrompt: string,
-    sendResponse: (type: Message["type"], payload: unknown) => void,
+    sendResponse: SendResponse,
     endResponse: () => void,
   ) {
     this.sendResponse = sendResponse;

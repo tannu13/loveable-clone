@@ -6,7 +6,7 @@ import { Harness } from "./services/harness";
 import { resolveResponse } from "./services/comms";
 import env from "./env";
 import { listProjectFiles } from "./services/projectFiles";
-import type { Message, ProjectSnapshot } from "@repo/shared";
+import type { Message, ProjectSnapshot, SendResponse } from "@repo/shared";
 
 const previewUrl = env.PROJECT_PREVIEW_URL;
 const messageHistory: Message[] = [];
@@ -56,18 +56,25 @@ app.post(
 
     res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
 
-    function sendResponse(type: "text", payload: string): void;
-    function sendResponse(type: "qna" | "plan", payload: unknown): void;
-    function sendResponse(type: Message["type"], payload: unknown) {
-      const message: Message = {
-        role: "assistant",
-        type,
-        content: payload as any,
-        createdAt: new Date().toISOString(),
-      };
+    const sendResponse: SendResponse = (...args) => {
+      const createdAt = new Date().toISOString();
+      const message: Message =
+        args[0] === "text"
+          ? {
+              role: "assistant",
+              type: args[0],
+              content: args[1],
+              createdAt,
+            }
+          : {
+              role: "assistant",
+              type: args[0],
+              content: args[1],
+              createdAt,
+            };
       messageHistory.push(message);
       res.write(`data: ${JSON.stringify(message)}\n\n`);
-    }
+    };
 
     const endResponse = () => {
       res.end();

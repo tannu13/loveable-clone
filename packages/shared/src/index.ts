@@ -12,13 +12,28 @@ type TextMessage = {
   content: string;
   createdAt: string;
 };
-type NonTextMessage = {
+type QnaMessage = {
   role: "user" | "assistant";
-  type: "qna" | "plan";
+  type: "qna";
   content: unknown;
   createdAt: string;
 };
-export type Message = TextMessage | NonTextMessage;
+type PlanMessage = {
+  role: "user" | "assistant";
+  type: "plan";
+  content: unknown;
+  createdAt: string;
+};
+export type Message = TextMessage | QnaMessage | PlanMessage;
+export type MessageType = Message["type"];
+export type MessageContent<TType extends MessageType> = Extract<
+  Message,
+  { type: TType }
+>["content"];
+export type SendResponseArgs = {
+  [TType in MessageType]: [type: TType, payload: MessageContent<TType>];
+}[MessageType];
+export type SendResponse = (...args: SendResponseArgs) => void;
 
 export type ProjectSnapshot = {
   summary: string;

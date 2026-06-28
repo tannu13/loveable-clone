@@ -6,7 +6,7 @@ import {
   readProjectFile,
   writeProjectFile,
 } from "./projectFiles";
-import { QnASchema, type Message } from "@repo/shared";
+import { QnASchema, type SendResponse } from "@repo/shared";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -15,7 +15,7 @@ interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   summaryText: (args: z.infer<S>) => string;
   execute: (
     args: z.infer<S>,
-    sendResponse: (type: Message["type"], payload: unknown) => void,
+    sendResponse: SendResponse,
   ) => Promise<Record<string, unknown>>;
 }
 
