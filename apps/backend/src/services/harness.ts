@@ -7,6 +7,7 @@ import {
   type PreToolCallContext,
 } from "./hooks";
 import { ToolRegistry } from "./tools";
+import { ContextManager } from "./contextManager";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
@@ -15,6 +16,7 @@ const sleep = (ms: number) => {
 export class Harness {
   private agent: Agent;
   private toolRegistry: ToolRegistry;
+  private contextManager: ContextManager;
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
   private sendResponse: SendResponse;
@@ -36,6 +38,7 @@ export class Harness {
     );
 
     this.toolRegistry = new ToolRegistry();
+    this.contextManager = new ContextManager();
 
     this.hooksRegistry = new HooksRegistry();
     const validateHook = new ValidateToolCallHook();
@@ -48,15 +51,21 @@ export class Harness {
     while (processing && iteration < this.maxIterations) {
       iteration++;
 
-      await sleep(6000);
+      await sleep(5000);
 
       const rawHistory = this.agent.getHistory();
 
+      // context compaction or summarization
+      const compactedHistory = this.contextManager.compactHistory(rawHistory);
+
       await this.hooksRegistry.executeHooks("pre-llm-call", {
-        rawHistory,
+        rawHistory: compactedHistory,
       });
 
-      const response = await this.agent.runStep(this.toolRegistry, rawHistory);
+      const response = await this.agent.runStep(
+        this.toolRegistry,
+        compactedHistory,
+      );
 
       if (response.functionCalls) {
         this.agent.addModelRole(
@@ -142,6 +151,7 @@ export class Harness {
         // no tool calls
         console.log("Final Response: ", response.text);
         console.dir(response.usageMetadata, { depth: 5 });
+        console.dir(this.agent.getHistory(), { depth: 10 });
         processing = false;
         this.sendResponse(
           "text",
