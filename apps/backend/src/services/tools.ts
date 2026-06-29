@@ -162,6 +162,68 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
   },
 };
 
+const UpdatePlanSchema = z.object({
+  explanation: z.string().optional(),
+  plan: z.array(
+    z.object({
+      step: z.string().min(1, "Step for each plan item is mandatory"),
+      status: z.enum(["pending", "in_progress", "completed"]),
+    }),
+  ),
+});
+export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
+  name: "updatePlan",
+  declaration: {
+    name: "updatePlan",
+    description:
+      "Use this tool to create and update the task plan. This is shown to the users so that they can see the plan items and their individual status. You can also pass in an optional explanation for the task plan.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        explanation: {
+          type: Type.STRING,
+          description: "A brief summary of the task plan",
+        },
+        plan: {
+          type: Type.ARRAY,
+          description:
+            "An array of plan item objects, each containing the step text and current status of the step",
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              step: {
+                type: Type.STRING,
+                description:
+                  "The summary of this step on what is or would be done in it.",
+              },
+              status: {
+                type: Type.STRING,
+                enum: ["pending", "in_progress", "completed"],
+                description:
+                  "One of pending, in_progress or completed depicting the current status of this step",
+              },
+            },
+            required: ["step", "status"],
+          },
+        },
+      },
+      required: ["plan"],
+    },
+  },
+  schema: UpdatePlanSchema,
+  summaryText(_args) {
+    return `Finalizing plan...`;
+  },
+  execute: async (args, sendResponse) => {
+    sendResponse("plan", {
+      explanation: args.explanation,
+      plan: args.plan,
+    });
+
+    return { message: "Plan updates sent to user" };
+  },
+};
+
 export class ToolRegistry {
   private tools = new Map<string, AgentTool>();
 
@@ -169,6 +231,7 @@ export class ToolRegistry {
     this.register(readFileTool)
       .register(writeFileTool)
       .register(qnaTool)
+      .register(updatePlanTool)
       .register(listFileTool);
   }
 

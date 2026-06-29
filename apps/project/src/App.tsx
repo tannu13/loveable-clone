@@ -5,7 +5,7 @@ export function App() {
     <main className="project-page">
       <section className="hero">
         <p className="kicker">Editable project folder</p>
-        <h1>The app gets updated via tool calls</h1>
+        <h1>Students update this app with Gemini tool calls.</h1>
         <p className="lede">
           This is the target React project. The main assignment app should
           inspect these files, ask Gemini what to change, write updates here,

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { QnAMessage } from "./components/QnAMessage";
 import { useConversationStream } from "./hooks/useConversationStream";
+import { isPlanComplete, PlanMessage } from "./components/PlanMessage";
 
 type ViewMode = "code" | "preview";
 
@@ -399,10 +400,10 @@ function ChatPanel({
   const [prompt, setPrompt] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const canSend = prompt.trim().length > 0 && !isStreaming;
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [isStreaming, messages.length]);
+  const renderableMessages = useMemo(
+    () => buildRenderableMessages(messages),
+    [messages],
+  );
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
@@ -432,15 +433,16 @@ function ChatPanel({
       <div className="min-h-0 flex-1 space-y-4 overflow-auto px-4 py-5">
         {isLoading ? (
           <EmptyState title="Loading messages" />
-        ) : messages.length === 0 ? (
+        ) : renderableMessages.length === 0 ? (
           <EmptyState
             title="No conversation yet"
             detail="Messages from the project API will appear here."
           />
         ) : (
-          messages.map((message, index) => (
+          renderableMessages.map(({ isStickyPlan, message }, index) => (
             <RenderMessage
               key={`${message.role}-${message.createdAt}-${index}`}
+              isStickyPlan={isStickyPlan}
               message={message}
             />
           ))
@@ -483,6 +485,65 @@ function ChatPanel({
   );
 }
 
+type RenderableMessage = {
+  isStickyPlan: boolean;
+  message: Message;
+};
+
+function buildRenderableMessages(messages: Message[]): RenderableMessage[] {
+  const renderableMessages: RenderableMessage[] = [];
+  let currentPlanIndex: number | null = null;
+
+  messages.forEach((message) => {
+    if (message.role === "user") {
+      currentPlanIndex = null;
+      renderableMessages.push({ isStickyPlan: false, message });
+      return;
+    }
+
+    if (message.type !== "plan") {
+      renderableMessages.push({ isStickyPlan: false, message });
+      return;
+    }
+
+    if (currentPlanIndex === null) {
+      currentPlanIndex = renderableMessages.length;
+      renderableMessages.push({ isStickyPlan: false, message });
+      return;
+    }
+
+    const currentPlan = renderableMessages[currentPlanIndex]?.message;
+
+    if (currentPlan && isPlanComplete(currentPlan.content)) {
+      currentPlanIndex = renderableMessages.length;
+      renderableMessages.push({ isStickyPlan: false, message });
+      return;
+    }
+
+    renderableMessages[currentPlanIndex] = {
+      isStickyPlan: false,
+      message: {
+        ...message,
+        createdAt: currentPlan?.createdAt ?? message.createdAt,
+      },
+    };
+  });
+
+  const latestIncompletePlanIndex = renderableMessages.findLastIndex(
+    ({ message }) =>
+      message.type === "plan" && !isPlanComplete(message.content),
+  );
+
+  if (latestIncompletePlanIndex >= 0) {
+    renderableMessages[latestIncompletePlanIndex] = {
+      ...renderableMessages[latestIncompletePlanIndex]!,
+      isStickyPlan: true,
+    };
+  }
+
+  return renderableMessages;
+}
+
 function EmptyState({ detail, title }: { detail?: string; title: string }) {
   return (
     <div className="px-3 py-8 text-center">
@@ -494,9 +555,21 @@ function EmptyState({ detail, title }: { detail?: string; title: string }) {
   );
 }
 
-function RenderMessage({ message }: { message: Message }) {
+function RenderMessage({
+  isStickyPlan = false,
+  message,
+}: {
+  isStickyPlan?: boolean;
+  message: Message;
+}) {
   if (message.type === "qna") {
     return <QnAMessage content={message.content} />;
+  } else if (message.type === "plan") {
+    return (
+      <div className={isStickyPlan ? "sticky bottom-0 z-10 py-1" : ""}>
+        <PlanMessage content={message.content} isSticky={isStickyPlan} />
+      </div>
+    );
   }
 
   const content =

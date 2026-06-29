@@ -15,7 +15,7 @@ const sleep = (ms: number) => {
 export class Harness {
   private agent: Agent;
   private toolRegistry: ToolRegistry;
-  private maxIterations = 9;
+  private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
   private sendResponse: SendResponse;
   private endResponse: () => void;
@@ -48,7 +48,7 @@ export class Harness {
     while (processing && iteration < this.maxIterations) {
       iteration++;
 
-      await sleep(4000);
+      await sleep(6000);
 
       const rawHistory = this.agent.getHistory();
 
@@ -72,8 +72,6 @@ export class Harness {
             );
             continue;
           }
-
-          console.log("fn.args", fn.args);
 
           const parseResult = tool.schema.safeParse(fn.args);
           if (!parseResult.success) {
