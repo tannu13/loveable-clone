@@ -116,6 +116,11 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
     parameters: {
       type: Type.OBJECT,
       properties: {
+        summary: {
+          type: Type.STRING,
+          description:
+            "Provide this as a summary of all the questions that you ask as short as possible. Also, keep a placeholder for answers per question. The format should be, if there were 3 questions - Question1_Summarised_Text##<ANSWER_PLACEHOLDER>::Question2_Summarised_Text##<ANSWER_PLACEHOLDER>::Question3_Summarised_Text##<ANSWER_PLACEHOLDER>",
+        },
         questions: {
           type: Type.ARRAY,
           description:
@@ -146,7 +151,7 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
           },
         },
       },
-      required: ["questions"],
+      required: ["summary", "questions"],
     },
   },
   schema: QnASchema,
@@ -155,10 +160,13 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
   },
   execute: async (args, sendResponse) => {
     const correlationId = crypto.randomUUID();
-    sendResponse("qna", { correlationId, questions: args.questions });
+    sendResponse("qna", {
+      correlationId,
+      questions: args.questions,
+    });
 
     const userAnswer = await waitForResponse(correlationId);
-    return { userAnswer };
+    return { userAnswer, summary: args.summary };
   },
 };
 

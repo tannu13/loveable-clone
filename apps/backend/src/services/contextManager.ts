@@ -26,6 +26,56 @@ export class ContextManager {
             args["instruction"] =
               "Context Compacted. File written successfully. Use the read file tool directly to get the file contents";
           }
+
+          if (part.functionCall?.name === "qnaTool" && args) {
+            // use the summary value and remove the questions array
+            delete args["questions"];
+            args["instruction"] =
+              "Context Compacted. Summary field has info in format `Question_Text##Selected_Answer::Question_Text##Selected_Answer`";
+
+            const userResponseMessage = messages[idx + 1];
+            if (
+              userResponseMessage &&
+              userResponseMessage?.role === "user" &&
+              userResponseMessage?.parts
+            ) {
+              // get the answers
+
+              const responsePartIdx = userResponseMessage.parts.findIndex(
+                (p) => p.functionResponse?.name === "qnaTool",
+              );
+              if (responsePartIdx >= 0 && userResponseMessage.parts) {
+                if (
+                  Array.isArray(
+                    userResponseMessage.parts[responsePartIdx]!.functionResponse
+                      ?.response?.userAnswer,
+                  )
+                ) {
+                  const answers: string[] = userResponseMessage.parts[
+                    responsePartIdx
+                  ]!.functionResponse?.response?.userAnswer.map(
+                    (a) => a.selectedOption,
+                  );
+                  let idx = 0;
+
+                  if (typeof args["summary"] === "string") {
+                    args["summary"] = args["summary"].replace(
+                      /<ANSWER_PLACEHOLDER>/g,
+                      () => {
+                        return (
+                          answers[idx++] ??
+                          "<Missed selection. Ask again using the qna tool>"
+                        );
+                      },
+                    );
+                  }
+                }
+              }
+              messages[idx + 1] = {
+                ...userResponseMessage,
+              };
+            }
+          }
           return {
             ...part,
             functionCall: {
@@ -65,6 +115,36 @@ export class ContextManager {
               delete response["content"];
               response["instruction"] =
                 "Context Compacted. Use the read file tool directly to get the file contents";
+            }
+
+            return {
+              ...part,
+              functionResponse: {
+                ...part.functionResponse,
+                response,
+              },
+            };
+          } else if (toolName === "qnaTool") {
+            const response = part.functionResponse?.response;
+            if (Array.isArray(response?.["userAnswer"])) {
+              const answers = response["userAnswer"].map(
+                (a) => a.selectedOption,
+              );
+
+              let idx = 0;
+              if (typeof response["summary"] === "string") {
+                response["summary"] = response["summary"].replace(
+                  /<ANSWER_PLACEHOLDER>/g,
+                  () => {
+                    return (
+                      answers[idx++] ??
+                      "<Missed selection. Ask again using the qna tool>"
+                    );
+                  },
+                );
+              }
+
+              delete response["userAnswer"];
             }
 
             return {

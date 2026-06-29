@@ -44,6 +44,7 @@ export type ProjectSnapshot = {
 };
 
 export const QnASchema = z.object({
+  summary: z.string().min(1, "Summary is mandatory"),
   questions: z.array(
     z.object({
       question: z.string().min(1, "Question statement should not be empty"),
