@@ -13,6 +13,8 @@ const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
 };
 
+const CONTEXT_TOKEN_THRESHOLD = 1000;
+const CONTEXT_SUMMARIZATION_MARK = 0.2;
 export class Harness {
   private agent: Agent;
   private toolRegistry: ToolRegistry;
@@ -21,6 +23,7 @@ export class Harness {
   private hooksRegistry: HooksRegistry;
   private sendResponse: SendResponse;
   private endResponse: () => void;
+  private currentPromptTokens = 0;
 
   status = "pending";
 
@@ -31,11 +34,7 @@ export class Harness {
   ) {
     this.sendResponse = sendResponse;
     this.endResponse = endResponse;
-    this.agent = new Agent(
-      env.GEMINI_API_KEY,
-      initialPrompt,
-      // "ask me a few questions on what i think about react",
-    );
+    this.agent = new Agent(env.GEMINI_API_KEY, initialPrompt);
 
     this.toolRegistry = new ToolRegistry();
     this.contextManager = new ContextManager();
@@ -48,24 +47,45 @@ export class Harness {
   async executeTask() {
     let iteration = 0;
     let processing = true;
+    let triggerSummarization = false;
     while (processing && iteration < this.maxIterations) {
       iteration++;
 
       await sleep(5000);
 
-      const rawHistory = this.agent.getHistory();
+      let messageHistory = this.agent.getHistory();
 
       // context compaction or summarization
-      const compactedHistory = this.contextManager.compactHistory(rawHistory);
+      if (this.currentPromptTokens > CONTEXT_TOKEN_THRESHOLD) {
+        if (triggerSummarization) {
+          triggerSummarization = false;
+          messageHistory = []; // do summarization here, how??
+        } else {
+          messageHistory = this.contextManager.compactHistory(messageHistory);
+        }
+
+        const { totalTokens: totalTokensAfterCompaction } =
+          await this.agent.countTokens(this.toolRegistry, messageHistory);
+
+        if (
+          totalTokensAfterCompaction &&
+          totalTokensAfterCompaction / this.currentPromptTokens <
+            CONTEXT_SUMMARIZATION_MARK
+        ) {
+          // the gains from compaction are minimal, so mark next cycle for summarization instead of compaction
+          triggerSummarization = true;
+        }
+      }
 
       await this.hooksRegistry.executeHooks("pre-llm-call", {
-        rawHistory: compactedHistory,
+        rawHistory: messageHistory,
       });
 
       const response = await this.agent.runStep(
         this.toolRegistry,
-        compactedHistory,
+        messageHistory,
       );
+      this.currentPromptTokens = response.usageMetadata?.totalTokenCount || 0;
 
       if (response.functionCalls) {
         this.agent.addModelRole(

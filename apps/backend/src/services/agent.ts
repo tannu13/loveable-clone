@@ -50,4 +50,18 @@ export class Agent {
       },
     });
   }
+
+  async countTokens(
+    registry: ToolRegistry,
+    contents: Content[] = this.history,
+  ) {
+    const declarations = registry.getGiminiDeclarations();
+    return await this.ai.models.countTokens({
+      model: this.model,
+      contents,
+      config: {
+        tools: [{ functionDeclarations: declarations }],
+      },
+    });
+  }
 }
