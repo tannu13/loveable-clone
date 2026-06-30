@@ -43,6 +43,41 @@ const messages: Content[] = [
     ],
   },
   {
+    role: "model",
+    parts: [
+      {
+        functionCall: {
+          name: "updatePlan",
+          args: {
+            summary:
+              "PENDING##Plan to fit an elephant in a room##Select a room::Shrink the elephant::Transport the elephant::Monitor the elephant",
+            explanation:
+              "A four-step plan to achieve the impossible task of fitting an elephant into a room using creative and unconventional methods.",
+            plan: [
+              {
+                status: "completed",
+                step: "Select an exceptionally large room or a magical spatial dimension.",
+              },
+              {
+                step: "Apply advanced shrinking technology to reduce the elephant's physical size.",
+                status: "completed",
+              },
+              {
+                step: "Carefully transport the shrunken elephant into the chosen room.",
+                status: "completed",
+              },
+              {
+                step: "Monitor the elephant to ensure it remains at the appropriate size for the space.",
+                status: "completed",
+              },
+            ],
+          },
+          id: "ktntfa2r",
+        },
+      },
+    ],
+  },
+  {
     role: "user",
     parts: [
       {

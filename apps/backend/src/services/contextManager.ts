@@ -12,8 +12,6 @@ export class ContextManager {
 
     const compactBeforeIdx = messages.length - this.keepLastNTurns;
 
-    console.log("compacting msg", messages.length);
-
     const compactedMessages: Content[] = messages.map((msg, idx) => {
       if (idx >= compactBeforeIdx) return msg;
 
@@ -25,6 +23,23 @@ export class ContextManager {
             delete args["content"];
             args["instruction"] =
               "Context Compacted. File written successfully. Use the read file tool directly to get the file contents";
+          }
+
+          if (part.functionCall?.name === "updatePlan" && args) {
+            if (Array.isArray(args["plan"])) {
+              const allCompleted = args["plan"].every(
+                (p) => p.status === "completed",
+              );
+              if (allCompleted && typeof args["summary"] === "string") {
+                const withoutStatusArr = args["summary"].split("##").slice(1);
+                args["summary"] = [
+                  "All Steps Completed",
+                  ...withoutStatusArr,
+                ].join("##");
+                delete args["explanation"];
+                delete args["plan"];
+              }
+            }
           }
 
           if (part.functionCall?.name === "qnaTool" && args) {

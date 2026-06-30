@@ -171,6 +171,7 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
 };
 
 const UpdatePlanSchema = z.object({
+  summary: z.string().min(1, "Summary is mandatory"),
   explanation: z.string().optional(),
   plan: z.array(
     z.object({
@@ -188,6 +189,11 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
     parameters: {
       type: Type.OBJECT,
       properties: {
+        summary: {
+          type: Type.STRING,
+          description:
+            "Provide a very short summary of the plan and one statement summary of all the steps involved in the plan in following format (if there were 3 steps in the current plan): <PLAN_STATUS_PLACEHOLDER>##Plan_Summary_Text##Summarised_Step_1_Text::Summarised_Step_2_Text::Summarised_Step_3_Text",
+        },
         explanation: {
           type: Type.STRING,
           description: "A brief summary of the task plan",
@@ -215,7 +221,7 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
           },
         },
       },
-      required: ["plan"],
+      required: ["plan", "summary"],
     },
   },
   schema: UpdatePlanSchema,
