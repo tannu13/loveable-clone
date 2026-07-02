@@ -20,6 +20,10 @@ export class Agent {
     return this.history;
   }
 
+  setHistory(updatedHistory: Content[]) {
+    this.history = updatedHistory;
+  }
+
   addUserRole(parts: Part[]) {
     this.history.push({
       role: "user",
@@ -34,8 +38,8 @@ export class Agent {
     });
   }
 
-  async runStep(registry: ToolRegistry, contents: Content[] = this.history) {
-    const declarations = registry.getGiminiDeclarations();
+  async runStep(contents: Content[] = this.history, registry?: ToolRegistry) {
+    const declarations = registry?.getGiminiDeclarations() || [];
     return await this.ai.models.generateContent({
       model: this.model,
       contents,

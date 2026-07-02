@@ -3,6 +3,14 @@ import { ContextManager } from "./contextManager";
 
 const messages: Content[] = [
   {
+    role: "user",
+    parts: [
+      {
+        text: "Please ask me questions about how i feel about react using the qna tool",
+      },
+    ],
+  },
+  {
     role: "model",
     parts: [
       {
@@ -43,6 +51,37 @@ const messages: Content[] = [
     ],
   },
   {
+    role: "user",
+    parts: [
+      {
+        functionResponse: {
+          name: "qnaTool",
+          response: {
+            userAnswer: [
+              {
+                question:
+                  "How would you rate your overall experience with React?",
+                selectedOption: "Neutral",
+              },
+              {
+                question:
+                  "How do you feel about the complexity of React hooks?",
+                selectedOption: "Very difficult",
+              },
+              {
+                question:
+                  "How much do you enjoy working with the React ecosystem (libraries, tools, etc.)?",
+                selectedOption: "Love it",
+              },
+            ],
+            summary:
+              "Overall_experience_rate##<ANSWER_PLACEHOLDER>::Hooks_complexity_feeling##<ANSWER_PLACEHOLDER>::Ecosystem_enjoyment##<ANSWER_PLACEHOLDER>",
+          },
+        },
+      },
+    ],
+  },
+  {
     role: "model",
     parts: [
       {
@@ -73,37 +112,6 @@ const messages: Content[] = [
             ],
           },
           id: "ktntfa2r",
-        },
-      },
-    ],
-  },
-  {
-    role: "user",
-    parts: [
-      {
-        functionResponse: {
-          name: "qnaTool",
-          response: {
-            userAnswer: [
-              {
-                question:
-                  "How would you rate your overall experience with React?",
-                selectedOption: "Neutral",
-              },
-              {
-                question:
-                  "How do you feel about the complexity of React hooks?",
-                selectedOption: "Very difficult",
-              },
-              {
-                question:
-                  "How much do you enjoy working with the React ecosystem (libraries, tools, etc.)?",
-                selectedOption: "Love it",
-              },
-            ],
-            summary:
-              "Overall_experience_rate##<ANSWER_PLACEHOLDER>::Hooks_complexity_feeling##<ANSWER_PLACEHOLDER>::Ecosystem_enjoyment##<ANSWER_PLACEHOLDER>",
-          },
         },
       },
     ],
@@ -179,6 +187,44 @@ const messages: Content[] = [
     ],
   },
   {
+    role: "user",
+    parts: [
+      {
+        text: "Proceed to next step",
+      },
+    ],
+  },
+  {
+    role: "model",
+    parts: [
+      {
+        functionCall: {
+          name: "writeFile",
+          args: {
+            content:
+              'const features = ["Prompt-driven edits", "Live React preview", "File tools"];\n\nconst pricingPlans = [\n  {\n    name: "Basic",\n    price: "$0",\n    period: "/mo",\n    features: ["1 user", "5 projects"],\n  },\n  {\n    name: "Pro",\n    price: "$19",\n    period: "/mo",\n    features: ["10 users", "Unlimited projects"],\n    highlight: true,\n  },\n  {\n    name: "Enterprise",\n    price: "$99",\n    period: "/mo",\n    features: ["Unlimited everything"],\n  },\n];\n\nexport function App() {\n  return (\n    <main className="project-page">\n      <section className="hero">\n        <p className="kicker">Editable project folder</p>\n        <h1>Students update this app with Gemini tool calls.</h1>\n        <p className="lede">\n          This is the target React project. The main assignment app should\n          inspect these files, ask Gemini what to change, write updates here,\n          and show the running preview.\n        </p>\n        <div className="feature-row">\n          {features.map((feature) => (\n            <span key={feature}>{feature}</span>\n          ))}\n        </div>\n      </section>\n\n      <section className="pricing">\n        <h2 className="pricing-title">Simple Pricing</h2>\n        <div className="pricing-grid">\n          {pricingPlans.map((plan) => (\n            <div key={plan.name} className={`pricing-card ${plan.highlight ? "highlighted" : ""}`}>\n              <h3 className="plan-name">{plan.name}</h3>\n              <div className="plan-price">\n                <span className="price">{plan.price}</span>\n                <span className="period">{plan.period}</span>\n              </div>\n              <ul className="plan-features">\n                {plan.features.map((feature) => (\n                  <li key={feature}>{feature}</li>\n                ))}\n              </ul>\n              <button className="plan-button">Get Started</button>\n            </div>\n          ))}\n        </div>\n      </section>\n    </main>\n  );\n}\n',
+            path: "src/App.tsx",
+          },
+          id: "w3bzfpb7",
+        },
+      },
+    ],
+  },
+  {
+    role: "user",
+    parts: [
+      {
+        functionResponse: {
+          name: "writeFile",
+          response: {
+            file: "src/App.tsx",
+            write: true,
+          },
+        },
+      },
+    ],
+  },
+  {
     role: "model",
     parts: [
       {
@@ -208,6 +254,18 @@ const messages: Content[] = [
     ],
   },
   {
+    role: "model",
+    parts: [
+      {
+        functionCall: {
+          name: "listFile",
+          args: {},
+          id: "3xoyk8a8",
+        },
+      },
+    ],
+  },
+  {
     role: "user",
     parts: [
       {
@@ -221,19 +279,9 @@ const messages: Content[] = [
       },
     ],
   },
-  {
-    role: "model",
-    parts: [
-      {
-        functionCall: {
-          name: "listFile",
-          args: {},
-          id: "3xoyk8a8",
-        },
-      },
-    ],
-  },
 ];
 
 const ctx = new ContextManager(1);
-const cmp = ctx.compactHistory(messages);
+const cmp = await ctx.summarizeHistory(messages);
+
+console.dir(cmp, { depth: 15 });

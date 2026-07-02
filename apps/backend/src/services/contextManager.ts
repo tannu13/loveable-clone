@@ -1,10 +1,71 @@
-import type { Content } from "@google/genai";
+import type { Content, Part } from "@google/genai";
+import { Agent } from "./agent";
+import env from "../env";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
+const SUMMARIZER_SYSTEM_PROMPT = ``;
 export class ContextManager {
   private keepLastNTurns;
 
   constructor(keepLastNTurns = 5) {
     this.keepLastNTurns = keepLastNTurns;
+  }
+
+  async summarizeHistory(messages: Content[]): Promise<Content[]> {
+    if (messages.length <= this.keepLastNTurns) return messages;
+
+    let compactBeforeIdx = messages.length - this.keepLastNTurns;
+
+    // after summarization, all the messages will be squished into one user message,
+    // the next message would be a hardcoded message on agent's behalf saying "it accepts the summary" something
+    // so adjust the messages being shrunk end at the agent's msg so that the next message is of a user.
+    // so that when they are stiched back together, they make one linear history.
+    if (
+      !messages[compactBeforeIdx] ||
+      messages[compactBeforeIdx]?.role === "model"
+    ) {
+      compactBeforeIdx--;
+    }
+    const oldHistoryChunk = messages.slice(0, compactBeforeIdx);
+
+    const currentFile = fileURLToPath(import.meta.url);
+    const currentDirectory = path.dirname(currentFile);
+
+    const summarizerPrompt = await readFile(
+      `${currentDirectory}/prompts/summarizer-system-prompt`,
+      "utf-8",
+    );
+
+    const agent = new Agent(env.GEMINI_API_KEY, "Summarize the below history");
+    oldHistoryChunk.push({
+      role: "user",
+      parts: [{ text: summarizerPrompt }],
+    });
+    const response = await agent.runStep(oldHistoryChunk);
+
+    const part: Part = {
+      text: response.text,
+    };
+
+    const summarizedHistory = [
+      {
+        role: "user",
+        parts: [part],
+      },
+      {
+        role: "model",
+        parts: [
+          {
+            text: "Understood. I have reviewed the architectural summary and the files modified so far. I am ready to continue.",
+          },
+        ],
+      },
+      ...messages.slice(compactBeforeIdx),
+    ];
+
+    return summarizedHistory;
   }
 
   compactHistory(messages: Content[]): Content[] {

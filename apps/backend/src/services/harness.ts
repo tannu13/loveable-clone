@@ -8,12 +8,13 @@ import {
 } from "./hooks";
 import { ToolRegistry } from "./tools";
 import { ContextManager } from "./contextManager";
+import type { GenerateContentResponse } from "@google/genai";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
 };
 
-const CONTEXT_TOKEN_THRESHOLD = 1000;
+const CONTEXT_TOKEN_THRESHOLD = 5000;
 const CONTEXT_SUMMARIZATION_MARK = 0.2;
 export class Harness {
   private agent: Agent;
@@ -44,6 +45,29 @@ export class Harness {
     this.hooksRegistry.register("pre-tool-call", validateHook);
   }
 
+  async handleErrorGracefully(
+    stepRunner: Promise<GenerateContentResponse>,
+    retries = 3,
+    delay = 1000,
+  ) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await stepRunner;
+      } catch (error: any) {
+        // Check for 500 or 503 internal/service unavailable errors
+        if (error.status === 500 && i < retries - 1) {
+          console.warn(
+            `Internal server error. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+        } else {
+          throw error;
+        }
+      }
+    }
+  }
+
   async executeTask() {
     let iteration = 0;
     let processing = true;
@@ -59,10 +83,13 @@ export class Harness {
       if (this.currentPromptTokens > CONTEXT_TOKEN_THRESHOLD) {
         if (triggerSummarization) {
           triggerSummarization = false;
-          messageHistory = []; // do summarization here, how??
+          messageHistory =
+            await this.contextManager.summarizeHistory(messageHistory);
         } else {
           messageHistory = this.contextManager.compactHistory(messageHistory);
         }
+
+        this.agent.setHistory(messageHistory);
 
         const { totalTokens: totalTokensAfterCompaction } =
           await this.agent.countTokens(this.toolRegistry, messageHistory);
@@ -81,10 +108,13 @@ export class Harness {
         rawHistory: messageHistory,
       });
 
-      const response = await this.agent.runStep(
-        this.toolRegistry,
-        messageHistory,
+      const response = await this.handleErrorGracefully(
+        this.agent.runStep(messageHistory, this.toolRegistry),
       );
+      if (!response) {
+        continue;
+      }
+
       this.currentPromptTokens = response.usageMetadata?.totalTokenCount || 0;
 
       if (response.functionCalls) {
