@@ -15,7 +15,7 @@ const sleep = (ms: number) => {
 };
 
 const CONTEXT_TOKEN_THRESHOLD = 5000;
-const CONTEXT_SUMMARIZATION_MARK = 0.2;
+const CONTEXT_SUMMARIZATION_MARK = 0.8;
 export class Harness {
   private agent: Agent;
   private toolRegistry: ToolRegistry;
@@ -81,26 +81,34 @@ export class Harness {
 
       // context compaction or summarization
       if (this.currentPromptTokens > CONTEXT_TOKEN_THRESHOLD) {
+        let wasSummarized = false;
+
         if (triggerSummarization) {
-          triggerSummarization = false;
           messageHistory =
             await this.contextManager.summarizeHistory(messageHistory);
+          wasSummarized = true;
+          triggerSummarization = false;
         } else {
           messageHistory = this.contextManager.compactHistory(messageHistory);
         }
 
+        const originalTokensBeforeCompression = this.currentPromptTokens;
         this.agent.setHistory(messageHistory);
 
-        const { totalTokens: totalTokensAfterCompaction } =
-          await this.agent.countTokens(this.toolRegistry, messageHistory);
+        const { totalTokens: newHistoryTokens } = await this.agent.countTokens(
+          messageHistory,
+          this.toolRegistry,
+        );
+        this.currentPromptTokens = newHistoryTokens || 0;
+        if (!wasSummarized && newHistoryTokens) {
+          const compactionRatio =
+            newHistoryTokens / originalTokensBeforeCompression;
 
-        if (
-          totalTokensAfterCompaction &&
-          totalTokensAfterCompaction / this.currentPromptTokens <
-            CONTEXT_SUMMARIZATION_MARK
-        ) {
-          // the gains from compaction are minimal, so mark next cycle for summarization instead of compaction
-          triggerSummarization = true;
+          // If the history is still > 80% of its original size, compaction was ineffective.
+          // Escalate to summarization for the NEXT time the threshold is breached.
+          if (compactionRatio > CONTEXT_SUMMARIZATION_MARK) {
+            triggerSummarization = true;
+          }
         }
       }
 

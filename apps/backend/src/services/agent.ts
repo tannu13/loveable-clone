@@ -56,8 +56,8 @@ export class Agent {
   }
 
   async countTokens(
-    registry: ToolRegistry,
     contents: Content[] = this.history,
+    registry: ToolRegistry,
   ) {
     const declarations = registry.getGiminiDeclarations();
     return await this.ai.models.countTokens({
