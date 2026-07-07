@@ -1,5 +1,13 @@
 import { relations } from "drizzle-orm";
-import { jsonb, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import {
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -11,12 +19,21 @@ export const conversations = pgTable("conversations", {
     .$onUpdate(() => new Date()),
 });
 
+export const messageRoleEnum = pgEnum("role", ["user", "assistant"]);
+export type TMessageRoleEnum = (typeof messageRoleEnum.enumValues)[number];
+
+export const messageTypeEnum = pgEnum("type", ["text", "qna", "plan"]);
+export type TMessageTypeEnum = (typeof messageTypeEnum.enumValues)[number];
+
 export const messageHistory = pgTable("message_history", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   conversationId: uuid("conversation_id")
     .notNull()
     .references(() => conversations.id),
-  message: jsonb("messages").notNull(),
+  content: text("content").notNull(),
+  role: messageRoleEnum().notNull(),
+  type: messageTypeEnum().notNull(),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

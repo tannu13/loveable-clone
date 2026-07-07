@@ -1,4 +1,8 @@
-import express, { type Request, type Response } from "express";
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import cors from "cors";
 import z from "zod";
 import { validate } from "./middlewares/validate";
@@ -7,6 +11,11 @@ import { resolveResponse } from "./services/comms";
 import env from "./env";
 import { listProjectFiles } from "./services/projectFiles";
 import type { Message, ProjectSnapshot, SendResponse } from "@repo/shared";
+import {
+  ConversationSchema,
+  type TConversationSchema,
+} from "./types/validations";
+import { AppError } from "./utils/custom-errors";
 
 const previewUrl = env.PROJECT_PREVIEW_URL;
 const messageHistory: Message[] = [];
@@ -41,10 +50,6 @@ app.get("/api/project", async (_request, response) => {
   response.status(200).json(ps);
 });
 
-const ConversationSchema = z.object({
-  message: z.string().min(1, "Message is mandatory for the conversation"),
-});
-type TConversationSchema = z.infer<typeof ConversationSchema>;
 app.post(
   "/api/conversation",
   validate("body", ConversationSchema),
@@ -105,5 +110,19 @@ app.post("/api/user-reply", async (req: Request, res: Response) => {
   res.json({ recorded: true });
 });
 
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof AppError && err.isOperational) {
+    return res.status(err.statusCode).json({
+      code: err.errorCode,
+      message: err.message,
+    });
+  }
+  console.error(err);
+  return res.status(500).json({
+    code: "INTERNAL_SERVER_ERROR",
+    message:
+      err instanceof Error ? err.message : "Something went wrong on our end.",
+  });
+});
 export default app;
 export { app };
