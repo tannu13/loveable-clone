@@ -105,7 +105,7 @@ export class Harness {
             newHistoryTokens / originalTokensBeforeCompression;
 
           // If the history is still > 80% of its original size, compaction was ineffective.
-          // Escalate to summarization for the NEXT time the threshold is breached.
+          // Escalate to summarization for the NEXT time the threshold is breached. - ref: manus
           if (compactionRatio > CONTEXT_SUMMARIZATION_MARK) {
             triggerSummarization = true;
           }

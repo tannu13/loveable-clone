@@ -7,6 +7,7 @@ const EnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   FRONTEND_URL: z.string().startsWith("http"),
   PROJECT_PREVIEW_URL: z.string().startsWith("http"),
+  DATABASE_URL: z.string().startsWith("postgresql://"),
 });
 
 type Env = z.infer<typeof EnvSchema>;
