@@ -22,10 +22,12 @@
   "dependencies": {
     "@google/genai": "^2.9.0",
     "@repo/shared": "workspace:*",
+    "bullmq": "^5.79.3",
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "postgres": "^3.4.9",
+    "redis": "^6.1.0",
     "zod": "^4.4.3"
   }
 }

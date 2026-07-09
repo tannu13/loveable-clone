@@ -8,6 +8,7 @@ const EnvSchema = z.object({
   FRONTEND_URL: z.string().startsWith("http"),
   PROJECT_PREVIEW_URL: z.string().startsWith("http"),
   DATABASE_URL: z.string().startsWith("postgresql://"),
+  REDIS_URL: z.string().startsWith("redis://"),
 });
 
 type Env = z.infer<typeof EnvSchema>;

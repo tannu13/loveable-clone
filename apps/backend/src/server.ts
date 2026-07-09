@@ -16,7 +16,12 @@ import {
   type TConversationSchema,
 } from "./types/validations";
 import { AppError } from "./utils/custom-errors";
+import { setupComms } from "./services/redis";
+import { createRoutes } from "./routes/conversation-routes";
+import { createControllers } from "./controllers/message-controller";
 
+const redisClient = await setupComms();
+const controllers = createControllers({ redis: redisClient });
 const previewUrl = env.PROJECT_PREVIEW_URL;
 const messageHistory: Message[] = [];
 
@@ -50,56 +55,59 @@ app.get("/api/project", async (_request, response) => {
   response.status(200).json(ps);
 });
 
-app.post(
-  "/api/conversation",
-  validate("body", ConversationSchema),
-  async (req: Request, res: Response) => {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
+const { convoRouter } = createRoutes(controllers);
+app.use(convoRouter);
 
-    res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
+// app.post(
+//   "/api/conversation",
+//   validate("body", ConversationSchema),
+//   async (req: Request, res: Response) => {
+//     res.setHeader("Content-Type", "text/event-stream");
+//     res.setHeader("Cache-Control", "no-cache");
+//     res.setHeader("Connection", "keep-alive");
+//     res.flushHeaders();
 
-    const sendResponse: SendResponse = (...args) => {
-      const createdAt = new Date().toISOString();
-      const message: Message =
-        args[0] === "text"
-          ? {
-              role: "assistant",
-              type: args[0],
-              content: args[1],
-              createdAt,
-            }
-          : {
-              role: "assistant",
-              type: args[0],
-              content: args[1],
-              createdAt,
-            };
-      messageHistory.push(message);
-      res.write(`data: ${JSON.stringify(message)}\n\n`);
-    };
+//     res.write(`data: ${JSON.stringify({ connected: true })}\n\n`);
 
-    const endResponse = () => {
-      res.end();
-    };
+//     const sendResponse: SendResponse = (...args) => {
+//       const createdAt = new Date().toISOString();
+//       const message: Message =
+//         args[0] === "text"
+//           ? {
+//               role: "assistant",
+//               type: args[0],
+//               content: args[1],
+//               createdAt,
+//             }
+//           : {
+//               role: "assistant",
+//               type: args[0],
+//               content: args[1],
+//               createdAt,
+//             };
+//       messageHistory.push(message);
+//       res.write(`data: ${JSON.stringify(message)}\n\n`);
+//     };
 
-    res.on("close", () => {
-      res.end();
-    });
-    const { message } = req.body as TConversationSchema;
-    messageHistory.push({
-      role: "user",
-      type: "text",
-      content: message,
-      createdAt: new Date().toISOString(),
-    });
+//     const endResponse = () => {
+//       res.end();
+//     };
 
-    const harness = new Harness(message, sendResponse, endResponse);
-    await harness.executeTask();
-  },
-);
+//     res.on("close", () => {
+//       res.end();
+//     });
+//     const { message } = req.body as TConversationSchema;
+//     messageHistory.push({
+//       role: "user",
+//       type: "text",
+//       content: message,
+//       createdAt: new Date().toISOString(),
+//     });
+
+//     const harness = new Harness(message, sendResponse, endResponse);
+//     await harness.executeTask();
+//   },
+// );
 
 app.post("/api/user-reply", async (req: Request, res: Response) => {
   const { correlationId, answers } = req.body;
