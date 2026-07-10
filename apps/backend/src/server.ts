@@ -19,9 +19,11 @@ import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
 import { createControllers } from "./controllers/message-controller";
+import { ConversationService } from "./services/conversation-service";
 
 const redisClient = await setupComms();
-const controllers = createControllers({ redis: redisClient });
+const conversationService = new ConversationService({ redis: redisClient });
+const controllers = createControllers(conversationService);
 const previewUrl = env.PROJECT_PREVIEW_URL;
 const messageHistory: Message[] = [];
 
