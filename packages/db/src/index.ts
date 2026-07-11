@@ -5,3 +5,4 @@ import * as schema from "./schema";
 const queryClient = postgres(process.env.DATABASE_URL!);
 export const db = drizzle(queryClient, { schema });
 export default db;
+export * from "drizzle-orm";

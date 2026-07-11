@@ -1,10 +1,10 @@
-import db from "../db";
+import db from "@repo/db";
 import {
   conversations,
   messageHistory,
   type TMessageRoleEnum,
   type TMessageTypeEnum,
-} from "../db/schema";
+} from "@repo/db/schema";
 import { InternalServerError, NotFoundError } from "../utils/custom-errors";
 
 export const getConversation = async (id: string) => {
@@ -45,7 +45,7 @@ export const saveConversation = async ({
   content: string;
   role: TMessageRoleEnum;
   type: TMessageTypeEnum;
-}) => {
+}): Promise<string> => {
   try {
     const [conversation] = await db
       .insert(conversations)
