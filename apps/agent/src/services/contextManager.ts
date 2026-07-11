@@ -1,6 +1,6 @@
 import type { Content, Part } from "@google/genai";
 import { Agent } from "./agent";
-import env from "../env";
+import env from "../../../backend/src/env";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";

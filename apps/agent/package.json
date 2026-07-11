@@ -1,0 +1,21 @@
+{
+  "name": "agent",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@google/genai": "^2.11.0",
+    "@repo/shared": "workspace:*",
+    "redis": "^6.1.0",
+    "zod": "^4.4.3"
+  }
+}

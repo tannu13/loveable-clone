@@ -4,25 +4,24 @@ import express, {
   type Response,
 } from "express";
 import cors from "cors";
-import z from "zod";
-import { validate } from "./middlewares/validate";
-import { Harness } from "./services/harness";
-import { resolveResponse } from "./services/comms";
+import { resolveResponse } from "../../agent/src/services/comms";
 import env from "./env";
-import { listProjectFiles } from "./services/projectFiles";
-import type { Message, ProjectSnapshot, SendResponse } from "@repo/shared";
-import {
-  ConversationSchema,
-  type TConversationSchema,
-} from "./types/validations";
+import { listProjectFiles } from "../../agent/src/services/projectFiles";
+import type { Message, ProjectSnapshot } from "@repo/shared";
 import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
 import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
+import { K8Service } from "./services/k8Service";
 
 const redisClient = await setupComms();
-const conversationService = new ConversationService({ redis: redisClient });
+const k8Service = new K8Service();
+await k8Service.init();
+const conversationService = new ConversationService({
+  redis: redisClient,
+  k8Service,
+});
 const controllers = createControllers(conversationService);
 const previewUrl = env.PROJECT_PREVIEW_URL;
 const messageHistory: Message[] = [];

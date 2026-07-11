@@ -6,6 +6,11 @@ export type ProjectFile = {
 };
 
 // type MessageType = "text" | "qna" | "plan";
+export const RedisMessageSchema = z.object({
+  conversationId: z.string().min(1),
+  message: z.string().min(1),
+});
+export type TRedisMessageSchema = z.infer<typeof RedisMessageSchema>;
 type TextMessage = {
   role: "user" | "assistant";
   type: "text";

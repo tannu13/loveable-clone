@@ -1,19 +1,15 @@
 import z from "zod";
 
 const EnvSchema = z.object({
-  APP_PORT: z.coerce.number().positive().default(3000),
-  NODE_ENV: z.enum(["development", "production"]).default("development"),
-  APP_STAGE: z.enum(["dev", "prod"]).default("dev"),
-  GEMINI_API_KEY: z.string().min(1),
-  FRONTEND_URL: z.string().startsWith("http"),
-  PROJECT_PREVIEW_URL: z.string().startsWith("http"),
-  DATABASE_URL: z.string().startsWith("postgresql://"),
-  REDIS_URL: z.string().startsWith("redis://"),
-  CLUSTER_REDIS_ACCESS_URL: z.string().startsWith("redis://"),
-  K8_NAMESPACE: z.string().default("loveable-clone"),
-  AGENT_DOCKER_IMAGE_PATH: z
+  REDIS_URL: z
     .string()
-    .default("tannnu13/loveable-clone-agent:latest"),
+    .startsWith("redis://")
+    .default("redis://localhost:6379"),
+  K8_NAMESPACE: z.string().default("loveable-clone"),
+  CONVERSATION_ID: z
+    .string()
+    // .min(1)
+    .default("44d2d019-526f-405d-b7ec-69fb4e5282b1"),
 });
 
 type Env = z.infer<typeof EnvSchema>;
@@ -33,8 +29,6 @@ try {
   }
   throw error;
 }
-
-export const isDev = env.APP_STAGE === "dev";
 
 export default env;
 export { env };
