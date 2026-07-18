@@ -1,5 +1,4 @@
 import type { SendResponse } from "@repo/shared";
-import env from "../../../backend/src/env";
 import { Agent } from "./agent";
 import {
   HooksRegistry,
@@ -9,6 +8,7 @@ import {
 import { ToolRegistry } from "./tools";
 import { ContextManager } from "./contextManager";
 import type { GenerateContentResponse } from "@google/genai";
+import env from "../env";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
@@ -23,19 +23,13 @@ export class Harness {
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
   private sendResponse: SendResponse;
-  private endResponse: () => void;
   private currentPromptTokens = 0;
 
   status = "pending";
 
-  constructor(
-    initialPrompt: string,
-    sendResponse: SendResponse,
-    endResponse: () => void,
-  ) {
+  constructor(sendResponse: SendResponse) {
     this.sendResponse = sendResponse;
-    this.endResponse = endResponse;
-    this.agent = new Agent(env.GEMINI_API_KEY, initialPrompt);
+    this.agent = new Agent(env.GEMINI_API_KEY);
 
     this.toolRegistry = new ToolRegistry();
     this.contextManager = new ContextManager();
@@ -43,6 +37,10 @@ export class Harness {
     this.hooksRegistry = new HooksRegistry();
     const validateHook = new ValidateToolCallHook();
     this.hooksRegistry.register("pre-tool-call", validateHook);
+  }
+
+  addUserPrompt(message: string) {
+    this.agent.addUserRole([{ text: message }]);
   }
 
   async handleErrorGracefully(
@@ -215,7 +213,6 @@ export class Harness {
           "text",
           JSON.stringify(response.text) || "Agent finished",
         );
-        this.endResponse();
       }
     }
 

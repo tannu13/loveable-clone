@@ -1,9 +1,9 @@
 import type { Content, Part } from "@google/genai";
 import { Agent } from "./agent";
-import env from "../../../backend/src/env";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import env from "../env";
 
 const SUMMARIZER_SYSTEM_PROMPT = ``;
 export class ContextManager {
@@ -38,7 +38,8 @@ export class ContextManager {
       "utf-8",
     );
 
-    const agent = new Agent(env.GEMINI_API_KEY, "Summarize the below history");
+    const agent = new Agent(env.GEMINI_API_KEY);
+    agent.addUserRole([{ text: "Summarize the below history" }]);
     oldHistoryChunk.push({
       role: "user",
       parts: [{ text: summarizerPrompt }],

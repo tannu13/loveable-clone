@@ -11,9 +11,8 @@ export class Agent {
   private history: Content[] = [];
   private model = "gemma-4-26b-a4b-it";
 
-  constructor(apiKey: string, initialPrompt: string) {
+  constructor(apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey });
-    this.addUserRole([{ text: initialPrompt }]);
   }
 
   getHistory() {

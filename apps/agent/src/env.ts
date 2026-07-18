@@ -10,6 +10,7 @@ const EnvSchema = z.object({
     .string()
     // .min(1)
     .default("44d2d019-526f-405d-b7ec-69fb4e5282b1"),
+  GEMINI_API_KEY: z.string().min(1),
 });
 
 type Env = z.infer<typeof EnvSchema>;
