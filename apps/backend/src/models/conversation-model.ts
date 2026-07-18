@@ -94,7 +94,9 @@ export const saveMessage = async (
     });
 
     return conversationId;
-  } catch {
+  } catch (err) {
+    console.log("Error saving message", err);
+
     throw new InternalServerError();
   }
 };

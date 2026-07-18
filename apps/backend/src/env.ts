@@ -7,6 +7,7 @@ const EnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   FRONTEND_URL: z.string().startsWith("http"),
   PROJECT_PREVIEW_URL: z.string().startsWith("http"),
+  DATABASE_URL: z.string().startsWith("postgresql://"),
   REDIS_URL: z.string().startsWith("redis://"),
   CLUSTER_REDIS_ACCESS_URL: z.string().startsWith("redis://"),
   K8_NAMESPACE: z.string().default("loveable-clone"),

@@ -29,13 +29,13 @@ export class ConversationService {
       ? await saveMessage(conversationId as string, payload)
       : await saveConversation(payload);
 
-    // create job for this and push it to agent process via bullmq
+    // create job for this and push it to agent process via redis
     const messagePayload: TRedisMessageSchema = {
       conversationId,
       message,
     };
     await this.publisher.lPush(
-      `convo-${conversationId}`,
+      `convo-request-${conversationId}`,
       JSON.stringify(messagePayload),
     );
 

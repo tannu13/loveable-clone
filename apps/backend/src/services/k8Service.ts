@@ -55,6 +55,7 @@ export class K8Service {
                   { name: "REDIS_URL", value: env.CLUSTER_REDIS_ACCESS_URL },
                   { name: "K8_NAMESPACE", value: env.K8_NAMESPACE },
                   { name: "CONVERSATION_ID", value: conversationId },
+                  { name: "GEMINI_API_KEY", value: env.GEMINI_API_KEY },
                 ],
               },
             ],

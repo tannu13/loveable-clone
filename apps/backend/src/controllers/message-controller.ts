@@ -1,8 +1,5 @@
 import type { Request, Response } from "express";
 import type { TConversationSchema } from "../types/validations";
-import { saveConversation, saveMessage } from "../models/conversation-model";
-import type { RedisClientType } from "redis";
-import { createNodeRedisClient, Queue } from "bullmq";
 import type { ConversationService } from "../services/conversation-service";
 
 export const createControllers = (service: ConversationService) => {

@@ -11,34 +11,17 @@ export const RedisMessageSchema = z.object({
   message: z.string().min(1),
 });
 export type TRedisMessageSchema = z.infer<typeof RedisMessageSchema>;
-type TextMessage = {
+export type Message = {
   role: "user" | "assistant";
-  type: "text";
-  content: string;
-  createdAt: string;
-};
-type QnaMessage = {
-  role: "user" | "assistant";
-  type: "qna";
+  type: "text" | "qna" | "plan";
   content: unknown;
   createdAt: string;
 };
-type PlanMessage = {
-  role: "user" | "assistant";
-  type: "plan";
-  content: unknown;
-  createdAt: string;
-};
-export type Message = TextMessage | QnaMessage | PlanMessage;
 export type MessageType = Message["type"];
-export type MessageContent<TType extends MessageType> = Extract<
-  Message,
-  { type: TType }
->["content"];
-export type SendResponseArgs = {
-  [TType in MessageType]: [type: TType, payload: MessageContent<TType>];
-}[MessageType];
-export type SendResponse = (...args: SendResponseArgs) => void;
+export type SendResponse = (
+  type: Message["type"],
+  payload: Message["content"],
+) => void;
 
 export type ProjectSnapshot = {
   summary: string;
