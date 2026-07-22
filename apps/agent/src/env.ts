@@ -2,6 +2,7 @@ import z from "zod";
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production"]).default("development"),
+  DATABASE_URL: z.string().startsWith("postgresql://"),
   REDIS_URL: z
     .string()
     .startsWith("redis://")

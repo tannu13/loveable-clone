@@ -1,48 +1,23 @@
 import { setupComms } from "./services/redis";
-import env from "./env";
-import { type SendResponse } from "@repo/shared";
-import { WorkerService } from "./services/worker-service";
+import { WorkerService } from "./services/workerService";
 import { Harness } from "./services/harness";
-import { createUploader } from "./services/upload-file";
-import type { EndResponse } from "./types";
-import { getCurrentFormattedDate } from "./utils";
+import { createUploader } from "./services/uploadFile";
 import type { Content } from "@google/genai";
+import { ResponseHandler } from "./services/responseHandler";
 
 const { subscriber, publisher } = await setupComms();
-const { loadStoreFromS3, uploadToS3 } = createUploader();
-const sendResponse: SendResponse = (type, payload) => {
-  publisher.publish(
-    `convo-response`,
-    JSON.stringify({ conversationId: env.CONVERSATION_ID, type, payload }),
-  );
-};
-const endResponse: EndResponse = async (history) => {
-  publisher.publish(
-    `convo-response`,
-    JSON.stringify({
-      conversationId: env.CONVERSATION_ID,
-      type: "text",
-      payload: "[DONE]",
-    }),
-  );
+const { loadBackupFromS3, uploadToS3 } = createUploader();
 
-  await uploadToS3(
-    { history },
-    `${getCurrentFormattedDate()}-chat-backup-${env.CONVERSATION_ID}`,
-  );
-};
+const responseHandler = new ResponseHandler(publisher, uploadToS3);
 
 let history: Content[] = [];
-const historyFromBackup = (await loadStoreFromS3()) as {
+const historyFromBackup = (await loadBackupFromS3()) as {
   history: Content[];
 } | null;
 if (historyFromBackup) {
   history = historyFromBackup.history;
 }
-const harness = new Harness(sendResponse, endResponse, history);
+const harness = new Harness(responseHandler, history);
 const worker = new WorkerService({ subscriber, harness });
-
-//td:: on boot - load up messages from db for this conversation, if any
-// worker.loadContext
 
 worker.listenForJobs();

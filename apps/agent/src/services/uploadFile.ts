@@ -60,7 +60,7 @@ export const createUploader = () => {
     }
   };
 
-  async function loadStoreFromS3() {
+  async function loadBackupFromS3() {
     const params = {
       Bucket: env.AWS_BUCKET_NAME,
       Key: BACKUP_FILE_NAME, // e.g., "backups/orderbook.json"
@@ -96,6 +96,6 @@ export const createUploader = () => {
     }
   }
 
-  return { uploadToS3, loadStoreFromS3 };
+  return { uploadToS3, loadBackupFromS3 };
 };
 export type TUploadToS3 = ReturnType<typeof createUploader>["uploadToS3"];

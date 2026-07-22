@@ -17,11 +17,6 @@ export type Message = {
   content: unknown;
   createdAt: string;
 };
-export type MessageType = Message["type"];
-export type SendResponse = (
-  type: Message["type"],
-  payload: Message["content"],
-) => void;
 
 export type ProjectSnapshot = {
   summary: string;

@@ -1,4 +1,3 @@
-import type { SendResponse } from "@repo/shared";
 import { Agent } from "./agent";
 import {
   HooksRegistry,
@@ -14,7 +13,7 @@ import type {
   Part,
 } from "@google/genai";
 import env from "../env";
-import type { EndResponse } from "../types";
+import type { ResponseHandler } from "./responseHandler";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
@@ -28,19 +27,13 @@ export class Harness {
   private contextManager: ContextManager;
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
-  private sendResponse: SendResponse;
-  private endResponse: EndResponse;
+  private responseHandler: ResponseHandler;
   private currentPromptTokens = 0;
 
   status = "pending";
 
-  constructor(
-    sendResponse: SendResponse,
-    endResponse: EndResponse,
-    pastHistory: Content[],
-  ) {
-    this.sendResponse = sendResponse;
-    this.endResponse = endResponse;
+  constructor(responseHandler: ResponseHandler, pastHistory: Content[]) {
+    this.responseHandler = responseHandler;
     this.agent = new Agent(env.GEMINI_API_KEY);
     if (pastHistory.length > 0) {
       this.agent.setHistory(pastHistory);
@@ -144,7 +137,7 @@ export class Harness {
       for await (const chunk of responseStream) {
         if (chunk.text) {
           accumulatedText += chunk.text;
-          this.sendResponse("text", chunk.text);
+          this.responseHandler.send("text", chunk.text);
         }
 
         // Collect candidate parts emitted during streaming
@@ -225,11 +218,14 @@ export class Harness {
 
           try {
             // streaming tool call summary back to user
-            this.sendResponse("text", tool.summaryText(parseResult.data));
+            this.responseHandler.send(
+              "text",
+              tool.summaryText(parseResult.data),
+            );
 
             const result = await tool.execute(
               parseResult.data as any,
-              this.sendResponse,
+              this.responseHandler,
             );
             toolResponseParts.push({
               functionResponse: {
@@ -251,7 +247,13 @@ export class Harness {
         console.dir(finalUsage, { depth: 5 });
         console.dir(this.agent.getHistory(), { depth: 10 });
         processing = false;
-        await this.endResponse(this.agent.getHistory());
+
+        this.responseHandler.end();
+        this.responseHandler.backupHistory(this.agent.getHistory());
+        this.responseHandler.saveToDB({
+          type: "text",
+          content: accumulatedText,
+        });
       }
     }
 

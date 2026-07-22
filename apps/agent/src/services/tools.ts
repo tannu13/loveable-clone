@@ -6,7 +6,8 @@ import {
   readProjectFile,
   writeProjectFile,
 } from "./projectFiles";
-import { QnASchema, type SendResponse } from "@repo/shared";
+import { QnASchema } from "@repo/shared";
+import type { ResponseHandler } from "./responseHandler";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -15,7 +16,7 @@ interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   summaryText: (args: z.infer<S>) => string;
   execute: (
     args: z.infer<S>,
-    sendResponse: SendResponse,
+    responseHandler: ResponseHandler,
   ) => Promise<Record<string, unknown>>;
 }
 
@@ -158,14 +159,27 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
   summaryText(_args) {
     return `Need more info, asking question(s) to user`;
   },
-  execute: async (args, sendResponse) => {
+  execute: async (args, responseHandler) => {
     const correlationId = crypto.randomUUID();
-    sendResponse("qna", {
+    responseHandler.send("qna", {
       correlationId,
       questions: args.questions,
     });
 
+    await responseHandler.saveToDB({
+      type: "qna",
+      content: "",
+      metadata: args.questions,
+    });
+
     const userAnswer = await waitForResponse(correlationId);
+    await responseHandler.saveToDB({
+      type: "qna",
+      content: "",
+      metadata: userAnswer,
+      role: "user",
+    });
+
     return { userAnswer, summary: args.summary };
   },
 };
@@ -228,10 +242,16 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
   summaryText(_args) {
     return `Finalizing plan...`;
   },
-  execute: async (args, sendResponse) => {
-    sendResponse("plan", {
+  execute: async (args, responseHandler) => {
+    responseHandler.send("plan", {
       explanation: args.explanation,
       plan: args.plan,
+    });
+
+    await responseHandler.saveToDB({
+      type: "plan",
+      content: args.explanation ?? "",
+      metadata: args.plan,
     });
 
     return { message: "Plan updates sent to user" };
