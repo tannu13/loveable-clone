@@ -1,6 +1,7 @@
 import z from "zod";
 
 const EnvSchema = z.object({
+  NODE_ENV: z.enum(["development", "production"]).default("development"),
   REDIS_URL: z
     .string()
     .startsWith("redis://")
@@ -11,6 +12,11 @@ const EnvSchema = z.object({
     // .min(1)
     .default("44d2d019-526f-405d-b7ec-69fb4e5282b1"),
   GEMINI_API_KEY: z.string().min(1),
+  AWS_REGION: z.string().min(1),
+  AWS_ACCESS_KEY_ID: z.string().min(1),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  AWS_BUCKET_NAME: z.string().min(1),
+  MINIO_ENDPOINT: z.string().min(1),
 });
 
 type Env = z.infer<typeof EnvSchema>;

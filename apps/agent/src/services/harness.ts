@@ -8,11 +8,13 @@ import {
 import { ToolRegistry } from "./tools";
 import { ContextManager } from "./contextManager";
 import type {
+  Content,
   FunctionCall,
   GenerateContentResponse,
   Part,
 } from "@google/genai";
 import env from "../env";
+import type { EndResponse } from "../types";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
@@ -27,15 +29,22 @@ export class Harness {
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
   private sendResponse: SendResponse;
-  private endResponse: Function;
+  private endResponse: EndResponse;
   private currentPromptTokens = 0;
 
   status = "pending";
 
-  constructor(sendResponse: SendResponse, endResponse: Function) {
+  constructor(
+    sendResponse: SendResponse,
+    endResponse: EndResponse,
+    pastHistory: Content[],
+  ) {
     this.sendResponse = sendResponse;
     this.endResponse = endResponse;
     this.agent = new Agent(env.GEMINI_API_KEY);
+    if (pastHistory.length > 0) {
+      this.agent.setHistory(pastHistory);
+    }
 
     this.toolRegistry = new ToolRegistry();
     this.contextManager = new ContextManager();
@@ -242,7 +251,7 @@ export class Harness {
         console.dir(finalUsage, { depth: 5 });
         console.dir(this.agent.getHistory(), { depth: 10 });
         processing = false;
-        this.endResponse();
+        await this.endResponse(this.agent.getHistory());
       }
     }
 
