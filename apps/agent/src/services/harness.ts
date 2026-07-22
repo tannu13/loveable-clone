@@ -7,7 +7,11 @@ import {
 } from "./hooks";
 import { ToolRegistry } from "./tools";
 import { ContextManager } from "./contextManager";
-import type { GenerateContentResponse } from "@google/genai";
+import type {
+  FunctionCall,
+  GenerateContentResponse,
+  Part,
+} from "@google/genai";
 import env from "../env";
 
 const sleep = (ms: number) => {
@@ -23,12 +27,14 @@ export class Harness {
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
   private sendResponse: SendResponse;
+  private endResponse: Function;
   private currentPromptTokens = 0;
 
   status = "pending";
 
-  constructor(sendResponse: SendResponse) {
+  constructor(sendResponse: SendResponse, endResponse: Function) {
     this.sendResponse = sendResponse;
+    this.endResponse = endResponse;
     this.agent = new Agent(env.GEMINI_API_KEY);
 
     this.toolRegistry = new ToolRegistry();
@@ -44,7 +50,7 @@ export class Harness {
   }
 
   async handleErrorGracefully(
-    stepRunner: Promise<GenerateContentResponse>,
+    stepRunner: Promise<AsyncGenerator<GenerateContentResponse, any, any>>,
     retries = 3,
     delay = 1000,
   ) {
@@ -114,22 +120,49 @@ export class Harness {
         rawHistory: messageHistory,
       });
 
-      const response = await this.handleErrorGracefully(
+      const responseStream = await this.handleErrorGracefully(
         this.agent.runStep(messageHistory, this.toolRegistry),
       );
-      if (!response) {
+      if (!responseStream) {
         continue;
       }
 
-      this.currentPromptTokens = response.usageMetadata?.totalTokenCount || 0;
+      let finalUsage: GenerateContentResponse["usageMetadata"] | undefined;
+      let accumulatedText = "";
+      const pendingFunctionCalls: FunctionCall[] = [];
+      let modelPartsFromStream: Part[] = [];
 
-      if (response.functionCalls) {
-        this.agent.addModelRole(
-          response.functionCalls.map((call) => ({ functionCall: call })),
-        );
+      for await (const chunk of responseStream) {
+        if (chunk.text) {
+          accumulatedText += chunk.text;
+          this.sendResponse("text", chunk.text);
+        }
 
+        // Collect candidate parts emitted during streaming
+        const candidateParts = chunk.candidates?.[0]?.content?.parts;
+        if (candidateParts && candidateParts.length > 0) {
+          modelPartsFromStream.push(...candidateParts);
+        }
+
+        // Collect function calls emitted during streaming
+        if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+          pendingFunctionCalls.push(...chunk.functionCalls);
+        }
+
+        if (chunk.usageMetadata) {
+          finalUsage = chunk.usageMetadata;
+        }
+      }
+
+      this.currentPromptTokens = finalUsage?.totalTokenCount || 0;
+
+      if (accumulatedText.trim().length > 0) {
+        this.agent.addModelRole([{ text: accumulatedText }]);
+      }
+      if (pendingFunctionCalls.length > 0) {
+        this.agent.addModelRole(modelPartsFromStream);
         const toolResponseParts = [];
-        for (const fn of response.functionCalls) {
+        for (const fn of pendingFunctionCalls) {
           const tool = this.toolRegistry.get(fn.name!);
           if (!tool) {
             console.warn(
@@ -205,14 +238,11 @@ export class Harness {
         this.agent.addUserRole(toolResponseParts);
       } else {
         // no tool calls
-        console.log("Final Response: ", response.text);
-        console.dir(response.usageMetadata, { depth: 5 });
+        console.log("Final Response: ", accumulatedText);
+        console.dir(finalUsage, { depth: 5 });
         console.dir(this.agent.getHistory(), { depth: 10 });
         processing = false;
-        this.sendResponse(
-          "text",
-          JSON.stringify(response.text) || "Agent finished",
-        );
+        this.endResponse();
       }
     }
 

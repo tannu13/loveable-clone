@@ -9,7 +9,8 @@ import type { ToolRegistry } from "./tools";
 export class Agent {
   private ai: GoogleGenAI;
   private history: Content[] = [];
-  private model = "gemma-4-26b-a4b-it";
+  // private model = "gemma-4-26b-a4b-it";
+  private model = "gemini-3.5-flash-lite";
 
   constructor(apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey });
@@ -39,7 +40,7 @@ export class Agent {
 
   async runStep(contents: Content[] = this.history, registry?: ToolRegistry) {
     const declarations = registry?.getGiminiDeclarations() || [];
-    return await this.ai.models.generateContent({
+    return await this.ai.models.generateContentStream({
       model: this.model,
       contents,
       config: {

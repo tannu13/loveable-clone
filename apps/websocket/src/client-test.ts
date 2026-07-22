@@ -12,7 +12,7 @@ ws.onmessage = (event: MessageEvent) => {
     const message: MessagePayload = JSON.parse(event.data);
     const { conversationId, payload } = message;
 
-    console.log({ conversationId, payload });
+    console.dir({ conversationId, payload }, { depth: 5 });
   } catch (error) {
     console.error("Failed to parse or process WebSocket message:", error);
   }

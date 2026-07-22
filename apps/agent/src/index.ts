@@ -11,7 +11,17 @@ const sendResponse: SendResponse = (type, payload) => {
     JSON.stringify({ conversationId: env.CONVERSATION_ID, type, payload }),
   );
 };
-const harness = new Harness(sendResponse);
+const endResponse = () => {
+  publisher.publish(
+    `convo-response`,
+    JSON.stringify({
+      conversationId: env.CONVERSATION_ID,
+      type: "text",
+      payload: "[DONE]",
+    }),
+  );
+};
+const harness = new Harness(sendResponse, endResponse);
 const worker = new WorkerService({ subscriber, harness });
 
 //td:: on boot - load up messages from db for this conversation, if any
