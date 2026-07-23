@@ -1,7 +1,12 @@
-import { RedisMessageSchema, type TRedisMessageSchema } from "@repo/shared";
+import {
+  QnAReplySchema,
+  RedisMessageSchema,
+  type TRedisMessageSchema,
+} from "@repo/shared";
 import type { RedisClientType } from "redis";
 import env from "../env";
 import type { Harness } from "./harness";
+import { resolveResponse } from "./comms";
 
 export class WorkerService {
   private subscriber: RedisClientType;
@@ -42,8 +47,14 @@ export class WorkerService {
   }
 
   async handleJob(jobData: TRedisMessageSchema) {
-    this.harness.addUserPrompt(jobData.message);
-
-    await this.harness.executeTask();
+    if (jobData.type === "text" && typeof jobData.message === "string") {
+      this.harness.addUserPrompt(jobData.message);
+      await this.harness.executeTask();
+    } else if (jobData.type === "qna") {
+      const result = QnAReplySchema.safeParse(jobData.message);
+      if (result.success) {
+        resolveResponse(result.data.correlationId, result.data.answers);
+      }
+    }
   }
 }

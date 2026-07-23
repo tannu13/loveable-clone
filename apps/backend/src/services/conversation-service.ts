@@ -32,6 +32,7 @@ export class ConversationService {
     // create job for this and push it to agent process via redis
     const messagePayload: TRedisMessageSchema = {
       conversationId,
+      type: "text",
       message,
     };
     await this.publisher.lPush(
@@ -43,5 +44,21 @@ export class ConversationService {
     this.k8Service.ensureConversationPod(conversationId);
 
     return { conversationId };
+  }
+
+  async handleAnswers(
+    conversationId: string,
+    correlationId: string,
+    answers: unknown,
+  ) {
+    const answerPayload: TRedisMessageSchema = {
+      conversationId,
+      type: "qna",
+      message: { correlationId, answers },
+    };
+    await this.publisher.lPush(
+      `convo-request-${conversationId}`,
+      JSON.stringify(answerPayload),
+    );
   }
 }

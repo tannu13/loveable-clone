@@ -9,8 +9,8 @@ import type { ToolRegistry } from "./tools";
 export class Agent {
   private ai: GoogleGenAI;
   private history: Content[] = [];
-  // private model = "gemma-4-26b-a4b-it";
-  private model = "gemini-3.5-flash-lite";
+  private model = "gemma-4-26b-a4b-it";
+  // private model = "gemini-3.5-flash-lite";
 
   constructor(apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey });

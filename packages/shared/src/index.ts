@@ -6,9 +6,11 @@ export type ProjectFile = {
 };
 
 // type MessageType = "text" | "qna" | "plan";
+const MessageTypes = z.enum(["text", "qna", "plan"]);
 export const RedisMessageSchema = z.object({
   conversationId: z.string().min(1),
-  message: z.string().min(1),
+  type: MessageTypes,
+  message: z.unknown(),
 });
 export type TRedisMessageSchema = z.infer<typeof RedisMessageSchema>;
 export type Message = {
@@ -42,3 +44,9 @@ export const CorrelationIdSchema = z.object({
 export const QnASchemaWithCorrelationId = QnASchema.extend(
   CorrelationIdSchema.shape,
 );
+
+export const QnAReplySchema = z.object({
+  answers: z.unknown(),
+  correlationId: z.string().min(1),
+});
+export type TQnAReplySchema = z.infer<typeof QnAReplySchema>;

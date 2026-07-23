@@ -110,15 +110,6 @@ app.use(convoRouter);
 //   },
 // );
 
-app.post("/api/user-reply", async (req: Request, res: Response) => {
-  const { correlationId, answers } = req.body;
-  console.log("correlationId", correlationId);
-
-  resolveResponse(correlationId, answers)!;
-
-  res.json({ recorded: true });
-});
-
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof AppError && err.isOperational) {
     return res.status(err.statusCode).json({
