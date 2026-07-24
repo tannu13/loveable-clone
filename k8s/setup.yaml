@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: loveable-clone
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runner-script-config
+  namespace: loveable-clone
+data:
+  app-runner-configmap.cjs: |
+    const http = require("http");
+    const { spawn } = require("child_process");
+
+    let devServerProcess = null;
+
+    const server = http.createServer((req, res) => {
+      if (req.method === "POST" && req.url === "/start") {
+        if (devServerProcess) {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ status: "already_running" }));
+        }
+
+        console.log("Starting React dev server...");
+
+        devServerProcess = spawn("npm", ["run", "dev"], {
+          cwd: "/app",
+          shell: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+
+        devServerProcess.stdout.on("data", (data) => {
+          console.log(`[Vite Output]: ${data}`);
+        });
+
+        devServerProcess.stderr.on("data", (data) => {
+          console.error(`[Vite Error]: ${data}`);
+        });
+
+        devServerProcess.on("exit", (code) => {
+          console.log(`Dev server exited with code ${code}`);
+          devServerProcess = null;
+        });
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ status: "started" }));
+      }
+
+      res.writeHead(404);
+      res.end("Not Found");
+    });
+
+    server.listen(8080, "0.0.0.0", () => {
+      console.log("Runner listener active on port 8080");
+    });
+---
+# the ServiceAccount identity - ID badge
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-runner-sa
+  namespace: loveable-clone
+
+---
+# Define allowed permissions - list of access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ingress-manager-role
+  namespace: loveable-clone
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+---
+# Bind the ServiceAccount to the Role - the lanyard that connects the ID badge to the list
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-runner-ingress-binding
+  namespace: loveable-clone
+subjects:
+  - kind: ServiceAccount
+    name: agent-runner-sa
+    namespace: loveable-clone
+roleRef:
+  kind: Role
+  name: ingress-manager-role
+  apiGroup: rbac.authorization.k8s.io
