@@ -44,10 +44,16 @@ export class ContextManager {
       role: "user",
       parts: [{ text: summarizerPrompt }],
     });
-    const response = await agent.runStep(oldHistoryChunk);
+    const responseStream = await agent.runStep(oldHistoryChunk);
+    let accumulatedText = "";
+    for await (const chunk of responseStream) {
+      if (chunk.text) {
+        accumulatedText += chunk.text;
+      }
+    }
 
     const part: Part = {
-      text: response.text,
+      text: accumulatedText,
     };
 
     const summarizedHistory = [

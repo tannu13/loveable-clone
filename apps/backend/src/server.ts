@@ -4,7 +4,6 @@ import express, {
   type Response,
 } from "express";
 import cors from "cors";
-import { resolveResponse } from "../../agent/src/services/comms";
 import env from "./env";
 import { listProjectFiles } from "../../agent/src/services/projectFiles";
 import type { Message, ProjectSnapshot } from "@repo/shared";
