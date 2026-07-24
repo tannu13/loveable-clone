@@ -41,6 +41,7 @@ export class ConversationService {
     );
 
     // td::spin up a pod in k8 cluster with an agent worker (who listens to this job) and project app
+    this.k8Service.ensureWorkspacePVC(conversationId);
     this.k8Service.ensureConversationPod(conversationId);
 
     return { conversationId };

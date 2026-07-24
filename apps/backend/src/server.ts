@@ -16,7 +16,6 @@ import { K8Service } from "./services/k8Service";
 
 const redisClient = await setupComms();
 const k8Service = new K8Service();
-await k8Service.init();
 const conversationService = new ConversationService({
   redis: redisClient,
   k8Service,
