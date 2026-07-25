@@ -19,6 +19,7 @@ const EnvSchema = z.object({
   AWS_CHAT_BUCKET_NAME: z.string().min(1),
   AWS_STARTER_TEMPLATES_BUCKET_NAME: z.string().min(1),
   WORKSPACE_DIR: z.string().min(1),
+  APP_RUNNER_BASE_URL: z.string().url().default("http://127.0.0.1:8080"),
   MINIO_ENDPOINT: z.string().min(1),
 });
 

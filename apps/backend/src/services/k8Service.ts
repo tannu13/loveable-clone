@@ -120,6 +120,10 @@ export class K8Service {
                     value:
                       "postgresql://perps_user:mysecretpasswordfordb@host.minikube.internal:5432/loveable_clone",
                   },
+                  {
+                    name: "APP_RUNNER_BASE_URL",
+                    value: "http://127.0.0.1:8080",
+                  },
                 ],
               },
               {

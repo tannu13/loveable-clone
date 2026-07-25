@@ -1,8 +1,5 @@
 import { Type, type FunctionDeclaration } from "@google/genai";
 import z from "zod";
-import { access } from "node:fs/promises";
-import path from "node:path";
-import { spawn } from "node:child_process";
 import { waitForResponse } from "../comms";
 import {
   listProjectFiles,
@@ -11,8 +8,8 @@ import {
 } from "./projectFiles";
 import { QnASchema } from "@repo/shared";
 import type { ResponseHandler } from "../responseHandler";
-import { s3Service } from "../s3Service";
-import env from "../../env";
+import { startBuildingApp } from "./startBuildingApp";
+import { fetchRunnerLogsAfterDelay } from "./runnerLogs";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -24,6 +21,9 @@ interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
     responseHandler: ResponseHandler,
   ) => Promise<Record<string, unknown>>;
 }
+
+const RUNNER_LOG_DELAY_MS = 1500;
+const RUNNER_LOG_LIMIT_AFTER_WRITE = 100;
 
 const ListFileSchema = z.object({});
 export const listFileTool: AgentTool<typeof ListFileSchema> = {
@@ -106,9 +106,16 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
   summaryText: (args) => `Writing to file @ ${args.path}`,
   execute: async (args) => {
     await writeProjectFile(args.path, args.content);
+    const runnerLogs = await fetchRunnerLogsAfterDelay({
+      delayMs: RUNNER_LOG_DELAY_MS,
+      limit: RUNNER_LOG_LIMIT_AFTER_WRITE,
+      errorMessage: "Failed to fetch runner logs after file write",
+    });
+
     return {
       file: args.path,
       write: true,
+      runnerLogs,
     };
   },
 };
@@ -116,61 +123,6 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
 const StartBuildingAppSchema = z.object({
   library: z.enum(["react", "vue"]),
 });
-
-type CommandResult = {
-  success: boolean;
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-  error?: string;
-};
-
-function runCommand(command: string, args: string[], cwd: string) {
-  return new Promise<CommandResult>((resolve) => {
-    const child = spawn(command, args, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-
-    child.stdout.on("data", (data) => {
-      stdout += data;
-    });
-
-    child.stderr.on("data", (data) => {
-      stderr += data;
-    });
-
-    child.on("error", (error) => {
-      resolve({
-        success: false,
-        exitCode: null,
-        stdout,
-        stderr,
-        error: error.message,
-      });
-    });
-
-    child.on("close", (exitCode) => {
-      resolve({
-        success: exitCode === 0,
-        exitCode,
-        stdout,
-        stderr,
-      });
-    });
-  });
-}
-
-async function validateStarterTemplate(workspaceDirectory: string) {
-  const packageJsonPath = path.join(workspaceDirectory, "package.json");
-  await access(packageJsonPath);
-}
 
 export const startBuildingAppTool: AgentTool<typeof StartBuildingAppSchema> = {
   name: "startBuildingApp",
@@ -193,69 +145,7 @@ export const startBuildingAppTool: AgentTool<typeof StartBuildingAppSchema> = {
   },
   schema: StartBuildingAppSchema,
   summaryText: (args) => `Setting up the ${args.library} starter...`,
-  execute: async (args) => {
-    const templateName = `${args.library}-starter-template.zip`;
-    const workspaceDirectory =
-      await s3Service.downloadTemplateFromS3(templateName);
-
-    if (!workspaceDirectory) {
-      return {
-        selectedLibrary: args.library,
-        setupComplete: false,
-        failedStep: "template_download",
-        template: {
-          name: templateName,
-          downloaded: false,
-        },
-      };
-    }
-
-    try {
-      await validateStarterTemplate(workspaceDirectory);
-    } catch (error) {
-      return {
-        selectedLibrary: args.library,
-        setupComplete: false,
-        failedStep: "template_validation",
-        template: {
-          name: templateName,
-          downloaded: true,
-          path: workspaceDirectory,
-        },
-        error:
-          error instanceof Error
-            ? error.message
-            : "Starter template validation failed",
-      };
-    }
-
-    const install = await runCommand("bun", ["install"], env.WORKSPACE_DIR);
-
-    if (!install.success) {
-      return {
-        selectedLibrary: args.library,
-        setupComplete: false,
-        failedStep: "install",
-        template: {
-          name: templateName,
-          downloaded: true,
-          path: workspaceDirectory,
-        },
-        install,
-      };
-    }
-
-    return {
-      selectedLibrary: args.library,
-      template: {
-        name: templateName,
-        downloaded: true,
-        path: workspaceDirectory,
-      },
-      install,
-      setupComplete: true,
-    };
-  },
+  execute: async (args) => startBuildingApp(args.library),
 };
 
 export const qnaTool: AgentTool<typeof QnASchema> = {
