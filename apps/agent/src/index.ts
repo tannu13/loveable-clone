@@ -1,17 +1,15 @@
 import { setupComms } from "./services/redis";
 import { WorkerService } from "./services/workerService";
 import { Harness } from "./services/agentServices/harness";
-import { createUploader } from "./services/uploadFile";
+import { s3Service } from "./services/uploadFile";
 import type { Content } from "@google/genai";
 import { ResponseHandler } from "./services/responseHandler";
 
 const { subscriber, publisher } = await setupComms();
-const { loadBackupFromS3, uploadToS3 } = createUploader();
-
-const responseHandler = new ResponseHandler(publisher, uploadToS3);
+const responseHandler = new ResponseHandler(publisher, s3Service.uploadToS3);
 
 let history: Content[] = [];
-const historyFromBackup = (await loadBackupFromS3()) as {
+const historyFromBackup = (await s3Service.loadBackupFromS3()) as {
   history: Content[];
 } | null;
 if (historyFromBackup) {

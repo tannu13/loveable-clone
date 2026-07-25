@@ -16,7 +16,9 @@ const EnvSchema = z.object({
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
-  AWS_BUCKET_NAME: z.string().min(1),
+  AWS_CHAT_BUCKET_NAME: z.string().min(1),
+  AWS_STARTER_TEMPLATES_BUCKET_NAME: z.string().min(1),
+  WORKSPACE_DIR: z.string().min(1),
   MINIO_ENDPOINT: z.string().min(1),
 });
 

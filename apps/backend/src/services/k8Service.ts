@@ -105,10 +105,16 @@ export class K8Service {
                     value: "http://host.minikube.internal:9000",
                   },
                   {
-                    name: "AWS_BUCKET_NAME",
+                    name: "AWS_CHAT_BUCKET_NAME",
                     value:
                       "s30-loveable-clone-chat-bucket-410940411202-ap-south-1-an",
                   },
+                  {
+                    name: "AWS_STARTER_TEMPLATES_BUCKET_NAME",
+                    value:
+                      "s30-loveable-startertemplates-bucket-410940411202-ap-south-1-an",
+                  },
+                  { name: "WORKSPACE_DIR", value: "/workspace" },
                   {
                     name: "DATABASE_URL",
                     value:

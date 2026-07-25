@@ -5,7 +5,7 @@ import express, {
 } from "express";
 import cors from "cors";
 import env from "./env";
-import { listProjectFiles } from "../../agent/src/services/projectFiles";
+import { listProjectFiles } from "../../agent/src/services/agentServices/projectFiles";
 import type { Message, ProjectSnapshot } from "@repo/shared";
 import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";

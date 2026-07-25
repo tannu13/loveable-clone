@@ -5,22 +5,28 @@ import {
   HeadObjectCommand,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import { Readable } from "stream";
+import * as unzipper from "unzipper";
 import env from "../env";
 
 const isDev = env.NODE_ENV === "development";
 const BACKUP_FILE_NAME = `chat-backup-${env.CONVERSATION_ID}-latest.json`;
-export const createUploader = () => {
-  const s3Client = new S3Client({
-    region: env.AWS_REGION,
-    credentials: {
-      accessKeyId: env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-    },
-    endpoint: isDev ? env.MINIO_ENDPOINT : undefined,
-    forcePathStyle: isDev,
-  });
+class S3Service {
+  private client: S3Client;
 
-  const uploadToS3 = async (payload: any, destinationFileName: string) => {
+  constructor() {
+    this.client = new S3Client({
+      region: env.AWS_REGION,
+      credentials: {
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+      },
+      endpoint: isDev ? env.MINIO_ENDPOINT : undefined,
+      forcePathStyle: isDev,
+    });
+  }
+
+  uploadToS3 = async (payload: any, destinationFileName: string) => {
     try {
       const jsonString = JSON.stringify(
         payload,
@@ -34,7 +40,7 @@ export const createUploader = () => {
       );
 
       const uploadParams = {
-        Bucket: env.AWS_BUCKET_NAME,
+        Bucket: env.AWS_CHAT_BUCKET_NAME,
         Key: destinationFileName,
         Body: jsonString,
         ContentType: "application/json",
@@ -43,15 +49,15 @@ export const createUploader = () => {
       console.log(`uploading ${destinationFileName} to S3...`);
 
       const command = new PutObjectCommand(uploadParams);
-      const response = await s3Client.send(command);
+      const response = await this.client.send(command);
 
       // this way reading wud be always abt the latest file
       const copyCommand = new CopyObjectCommand({
-        Bucket: env.AWS_BUCKET_NAME,
-        CopySource: `${env.AWS_BUCKET_NAME}/${destinationFileName}`,
+        Bucket: env.AWS_CHAT_BUCKET_NAME,
+        CopySource: `${env.AWS_CHAT_BUCKET_NAME}/${destinationFileName}`,
         Key: BACKUP_FILE_NAME,
       });
-      await s3Client.send(copyCommand);
+      await this.client.send(copyCommand);
 
       console.log("uploaded", response);
       return response;
@@ -60,16 +66,16 @@ export const createUploader = () => {
     }
   };
 
-  async function loadBackupFromS3() {
+  async loadBackupFromS3() {
     const params = {
-      Bucket: env.AWS_BUCKET_NAME,
-      Key: BACKUP_FILE_NAME, // e.g., "backups/orderbook.json"
+      Bucket: env.AWS_CHAT_BUCKET_NAME,
+      Key: BACKUP_FILE_NAME,
     };
 
     try {
-      await s3Client.send(new HeadObjectCommand(params));
+      await this.client.send(new HeadObjectCommand(params));
 
-      const response = await s3Client.send(new GetObjectCommand(params));
+      const response = await this.client.send(new GetObjectCommand(params));
 
       if (!response.Body) {
         throw new Error("response.Body is undefined");
@@ -96,6 +102,46 @@ export const createUploader = () => {
     }
   }
 
-  return { uploadToS3, loadBackupFromS3 };
-};
-export type TUploadToS3 = ReturnType<typeof createUploader>["uploadToS3"];
+  async downloadTemplateFromS3(templateName: string) {
+    const params = {
+      Bucket: env.AWS_STARTER_TEMPLATES_BUCKET_NAME,
+      Key: templateName,
+    };
+
+    const outputDirectory = env.WORKSPACE_DIR;
+
+    try {
+      await this.client.send(new HeadObjectCommand(params));
+
+      const response = await this.client.send(new GetObjectCommand(params));
+
+      if (!response.Body) {
+        throw new Error("response.Body is undefined");
+      }
+
+      const stream = response.Body as Readable;
+
+      // Extract contents directly into the local target directory
+      await stream.pipe(unzipper.Extract({ path: outputDirectory })).promise();
+
+      console.log(
+        `Starter template files successfully downloaded and extracted to: ${outputDirectory}`,
+      );
+      return outputDirectory;
+    } catch (error: any) {
+      if (
+        error?.name === "NotFound" ||
+        error?.$metadata?.httpStatusCode === 404
+      ) {
+        console.log("No starter template found");
+        return null;
+      }
+
+      console.error("Error retrieving or extracting starter template:", error);
+      throw error;
+    }
+  }
+}
+
+export const s3Service = new S3Service();
+export type TUploadToS3 = S3Service["uploadToS3"];

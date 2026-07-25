@@ -8,6 +8,7 @@ import {
 } from "./projectFiles";
 import { QnASchema } from "@repo/shared";
 import type { ResponseHandler } from "../responseHandler";
+import { s3Service } from "../uploadFile";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -133,6 +134,8 @@ export const startBuildingAppTool: AgentTool<typeof StartBuildingAppSchema> = {
   schema: StartBuildingAppSchema,
   summaryText: (args) => `Setting up the ${args.library} starter...`,
   execute: async (args) => {
+    const templateName = `${args.library}-starter-template.zip`;
+    await s3Service.downloadTemplateFromS3(templateName);
     return {
       selectedLibrary: args.library,
       setupComplete: true,

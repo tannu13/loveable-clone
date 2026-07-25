@@ -12,7 +12,7 @@ const server = http.createServer((req, res) => {
       return res.end(JSON.stringify({ status: "already_running" }));
     }
 
-    console.log("Starting React dev server...");
+    console.log("Starting server...");
 
     devServerProcess = spawn("npm", ["run", "dev"], {
       cwd: "/app",
