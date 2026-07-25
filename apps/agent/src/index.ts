@@ -1,6 +1,6 @@
 import { setupComms } from "./services/redis";
 import { WorkerService } from "./services/workerService";
-import { Harness } from "./services/harness";
+import { Harness } from "./services/agentServices/harness";
 import { createUploader } from "./services/uploadFile";
 import type { Content } from "@google/genai";
 import { ResponseHandler } from "./services/responseHandler";

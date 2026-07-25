@@ -3,7 +3,7 @@ import { Agent } from "./agent";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import env from "../env";
+import env from "../../env";
 
 const SUMMARIZER_SYSTEM_PROMPT = ``;
 export class ContextManager {

@@ -5,7 +5,7 @@ import {
 } from "@repo/shared";
 import type { RedisClientType } from "redis";
 import env from "../env";
-import type { Harness } from "./harness";
+import type { Harness } from "./agentServices/harness";
 import { resolveResponse } from "./comms";
 
 export class WorkerService {

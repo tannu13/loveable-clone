@@ -12,8 +12,8 @@ import type {
   GenerateContentResponse,
   Part,
 } from "@google/genai";
-import env from "../env";
-import type { ResponseHandler } from "./responseHandler";
+import env from "../../env";
+import type { ResponseHandler } from "../responseHandler";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));

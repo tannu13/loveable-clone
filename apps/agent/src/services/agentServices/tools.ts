@@ -1,13 +1,13 @@
 import { Type, type FunctionDeclaration } from "@google/genai";
 import z from "zod";
-import { waitForResponse } from "./comms";
+import { waitForResponse } from "../comms";
 import {
   listProjectFiles,
   readProjectFile,
   writeProjectFile,
 } from "./projectFiles";
 import { QnASchema } from "@repo/shared";
-import type { ResponseHandler } from "./responseHandler";
+import type { ResponseHandler } from "../responseHandler";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -104,6 +104,38 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
     return {
       file: args.path,
       write: true,
+    };
+  },
+};
+
+const StartBuildingAppSchema = z.object({
+  library: z.enum(["react", "vue"]),
+});
+export const startBuildingAppTool: AgentTool<typeof StartBuildingAppSchema> = {
+  name: "startBuildingApp",
+  declaration: {
+    name: "startBuildingApp",
+    description:
+      "Use this tool if you want to start building a react app and there is no code available yet. This tool would download a starter react template code at the accessible location and provision anythting else needed for that app to be available. Do not start writing react app code files from scratch and instead use this tool to setup all the necessary environments.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        library: {
+          type: Type.STRING,
+          enum: ["react", "vue"],
+          description:
+            "provide the library name for which the starter template needs to be downloaded. can be either react or vue",
+        },
+      },
+      required: ["library"],
+    },
+  },
+  schema: StartBuildingAppSchema,
+  summaryText: (args) => `Setting up the ${args.library} starter...`,
+  execute: async (args) => {
+    return {
+      selectedLibrary: args.library,
+      setupComplete: true,
     };
   },
 };
@@ -264,6 +296,7 @@ export class ToolRegistry {
   constructor() {
     this.register(readFileTool)
       .register(writeFileTool)
+      .register(startBuildingAppTool)
       .register(qnaTool)
       .register(updatePlanTool)
       .register(listFileTool);
