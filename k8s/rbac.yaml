@@ -1,0 +1,34 @@
+# the ServiceAccount identity - ID badge
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-runner-sa
+  namespace: loveable-clone
+
+---
+# Define allowed permissions - list of access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ingress-manager-role
+  namespace: loveable-clone
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+---
+# Bind the ServiceAccount to the Role - the lanyard that connects the ID badge to the list
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-runner-ingress-binding
+  namespace: loveable-clone
+subjects:
+  - kind: ServiceAccount
+    name: agent-runner-sa
+    namespace: loveable-clone
+roleRef:
+  kind: Role
+  name: ingress-manager-role
+  apiGroup: rbac.authorization.k8s.io
