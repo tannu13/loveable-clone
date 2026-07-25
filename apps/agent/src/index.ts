@@ -1,7 +1,7 @@
 import { setupComms } from "./services/redis";
 import { WorkerService } from "./services/workerService";
 import { Harness } from "./services/agentServices/harness";
-import { s3Service } from "./services/uploadFile";
+import { s3Service } from "./services/s3Service";
 import type { Content } from "@google/genai";
 import { ResponseHandler } from "./services/responseHandler";
 

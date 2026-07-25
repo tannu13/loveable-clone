@@ -124,7 +124,17 @@ export class K8Service {
               },
               {
                 name: "app-runner",
-                image: "node:18-alpine",
+                image: "oven/bun:alpine",
+                ports: [
+                  {
+                    name: "preview",
+                    containerPort: 5173,
+                  },
+                  {
+                    name: "runner-api",
+                    containerPort: 8080,
+                  },
+                ],
                 volumeMounts: [
                   {
                     name: "workspace-storage",
@@ -135,7 +145,7 @@ export class K8Service {
                     mountPath: "/scripts",
                   },
                 ],
-                command: ["node", "/scripts/app-runner-configmap.cjs"],
+                command: ["bun", "/scripts/app-runner-configmap.cjs"],
               },
             ],
           },

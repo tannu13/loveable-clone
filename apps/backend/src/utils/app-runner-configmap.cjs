@@ -14,11 +14,14 @@ const server = http.createServer((req, res) => {
 
     console.log("Starting server...");
 
-    devServerProcess = spawn("npm", ["run", "dev"], {
-      cwd: "/app",
-      shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    devServerProcess = spawn(
+      "bun",
+      ["run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"],
+      {
+        cwd: "/app",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
 
     devServerProcess.stdout.on("data", (data) => {
       console.log(`[Vite Output]: ${data}`);

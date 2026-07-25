@@ -19,9 +19,16 @@ data:
 
         console.log("Starting React dev server...");
 
-        devServerProcess = spawn("npm", ["run", "dev"], {
+        devServerProcess = spawn("bun", [
+          "run",
+          "dev",
+          "--",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "5173",
+        ], {
           cwd: "/app",
-          shell: true,
           stdio: ["ignore", "pipe", "pipe"],
         });
 

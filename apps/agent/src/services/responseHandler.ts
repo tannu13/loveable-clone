@@ -3,7 +3,7 @@ import type { RedisClientType } from "redis";
 import env from "../env";
 import type { Content } from "@google/genai";
 import { getCurrentFormattedDate } from "../utils";
-import type { TUploadToS3 } from "./uploadFile";
+import type { TUploadToS3 } from "./s3Service";
 import db from "@repo/db";
 import { messageHistory } from "@repo/db/schema";
 

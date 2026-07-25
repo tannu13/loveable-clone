@@ -1,11 +1,9 @@
 import type { ProjectFile } from "@repo/shared";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import env from "../../env";
 
-const currentFile = fileURLToPath(import.meta.url);
-const currentDirectory = path.dirname(currentFile);
-const projectRoot = path.resolve(currentDirectory, "../../../project");
+const projectRoot = path.resolve(env.WORKSPACE_DIR);
 
 const editableExtensions = new Set([
   ".css",
@@ -56,11 +54,30 @@ function toProjectPath(filePath: string) {
   return path.relative(projectRoot, filePath).split(path.sep).join("/");
 }
 
+function resolveProjectPath(filePath: string) {
+  const resolvedPath = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(projectRoot, filePath);
+  const relativePath = path.relative(projectRoot, resolvedPath);
+
+  if (
+    relativePath === ".." ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new Error(`Path is outside the project workspace: ${filePath}`);
+  }
+
+  return resolvedPath;
+}
+
 export async function readProjectFile(filePath: string): Promise<string> {
-  return await readFile(`${projectRoot}/${filePath}`, "utf8");
+  return await readFile(resolveProjectPath(filePath), "utf8");
 }
 
 export async function writeProjectFile(filePath: string, content: string) {
   if (!content) return;
-  await writeFile(`${projectRoot}/${filePath}`, content, "utf8");
+  const resolvedPath = resolveProjectPath(filePath);
+  await mkdir(path.dirname(resolvedPath), { recursive: true });
+  await writeFile(resolvedPath, content, "utf8");
 }
