@@ -14,17 +14,24 @@ export async function fetchRunnerLogsAfterDelay({
   delayMs: number;
   limit: number;
   errorMessage: string;
-}): Promise<TRunnerResponse<TRunnerLogsResponse>> {
+}): Promise<
+  TRunnerResponse<TRunnerLogsResponse> & { logFetchFailed: boolean }
+> {
   await sleep(delayMs);
 
   try {
-    return await appRunnerClient.logs({ limit });
+    const runnerLogs = await appRunnerClient.logs({ limit });
+    return {
+      ...runnerLogs,
+      logFetchFailed: !runnerLogs.ok,
+    };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : errorMessage,
-      status: 400,
+      statusCode: 0,
       body: null,
+      logFetchFailed: true,
     };
   }
 }

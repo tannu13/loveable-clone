@@ -3,7 +3,7 @@ import env from "../env";
 export type TRunnerResponse<T> = {
   ok: boolean;
   error?: string;
-  status: number;
+  statusCode: number;
   body: T | null;
 };
 
@@ -56,7 +56,7 @@ class AppRunnerClient {
 
     return {
       ok: response.ok,
-      status: response.status,
+      statusCode: response.status,
       body,
     } satisfies TRunnerResponse<T>;
   }
