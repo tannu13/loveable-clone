@@ -4,7 +4,7 @@ import {
   KubeConfig,
   NetworkingV1Api,
 } from "@kubernetes/client-node";
-import env, { isDev } from "../env";
+import env from "../env";
 
 export class K8Service {
   private k8sApi: CoreV1Api;
@@ -20,10 +20,6 @@ export class K8Service {
 
   private getPvcName(conversationId: string): string {
     return `pvc-${conversationId}`;
-  }
-
-  private getConfigMapName() {
-    return "runner-script-config";
   }
 
   private getPreviewServiceName(conversationId: string): string {
@@ -182,12 +178,6 @@ export class K8Service {
                   claimName: this.getPvcName(conversationId), // Links to the PVC
                 },
               },
-              {
-                name: "runner-script-vol",
-                configMap: {
-                  name: this.getConfigMapName(), // Points to the ConfigMap name
-                },
-              },
             ],
             containers: [
               {
@@ -240,7 +230,7 @@ export class K8Service {
                 env: [
                   { name: "APP_PORT", value: `${env.APP_RUNNER_PORT}` },
                   { name: "NODE_ENV", value: env.NODE_ENV },
-                  { name: "APP_DIR", value: "/app" },
+                  { name: "APP_DIR", value: "/user-app" },
                   { name: "DEV_HOST", value: "0.0.0.0" },
                   { name: "DEV_PORT", value: `${env.PREVIEW_APP_PORT}` },
                 ],
@@ -257,11 +247,7 @@ export class K8Service {
                 volumeMounts: [
                   {
                     name: "workspace-storage",
-                    mountPath: "/app", // Runner reads code from here
-                  },
-                  {
-                    name: "runner-script-vol",
-                    mountPath: "/scripts",
+                    mountPath: "/user-app", // Runner reads code from here
                   },
                 ],
               },

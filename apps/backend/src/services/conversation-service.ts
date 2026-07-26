@@ -1,6 +1,6 @@
 import { saveConversation, saveMessage } from "../models/conversation-model";
 import type { RedisClientType } from "redis";
-import type { K8Service } from "./k8Service";
+import type { K8Service } from "./k8sService";
 import type { TRedisMessageSchema } from "@repo/shared";
 
 export class ConversationService {

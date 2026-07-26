@@ -5,14 +5,13 @@ import express, {
 } from "express";
 import cors from "cors";
 import env from "./env";
-import { listProjectFiles } from "../../agent/src/services/agentServices/projectFiles";
 import type { Message, ProjectSnapshot } from "@repo/shared";
 import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
 import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
-import { K8Service } from "./services/k8Service";
+import { K8Service } from "./services/k8sService";
 
 const redisClient = await setupComms();
 const k8Service = new K8Service();
@@ -38,21 +37,22 @@ app.get("/health", (_req: Request, res: Response) => {
   });
 });
 
-app.get("/api/project", async (_request, response) => {
-  const files = await listProjectFiles();
-  const ps: ProjectSnapshot = {
-    summary: "",
-    messageHistory,
-    files,
-    updatedAt:
-      messageHistory.length > 0
-        ? messageHistory[messageHistory.length - 1]!.createdAt
-        : "",
-    previewUrl,
-  };
+// td:: move the list project files endpoint to agent or the app runner
+// app.get("/api/project", async (_request, response) => {
+//   const files = await listProjectFiles();
+//   const ps: ProjectSnapshot = {
+//     summary: "",
+//     messageHistory,
+//     files,
+//     updatedAt:
+//       messageHistory.length > 0
+//         ? messageHistory[messageHistory.length - 1]!.createdAt
+//         : "",
+//     previewUrl,
+//   };
 
-  response.status(200).json(ps);
-});
+//   response.status(200).json(ps);
+// });
 
 const { convoRouter } = createRoutes(controllers);
 app.use(convoRouter);
