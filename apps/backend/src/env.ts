@@ -17,6 +17,11 @@ const EnvSchema = z.object({
   AGENT_DOCKER_IMAGE_PATH: z
     .string()
     .default("tannnu13/loveable-clone-agent:latest"),
+  APP_RUNNER_DOCKER_IMAGE_PATH: z
+    .string()
+    .default("tannnu13/loveable-clone-app-runner:latest"),
+  APP_RUNNER_PORT: z.coerce.number().positive().default(8080),
+  PREVIEW_APP_PORT: z.coerce.number().positive().default(5174),
 });
 
 type Env = z.infer<typeof EnvSchema>;

@@ -5,7 +5,7 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   APP_DIR: z.string().min(1).default("/app"),
   DEV_HOST: z.string().min(1).default("0.0.0.0"),
-  DEV_PORT: z.coerce.number().positive().default(5173),
+  DEV_PORT: z.coerce.number().positive().default(5174),
 });
 
 type Env = z.infer<typeof EnvSchema>;

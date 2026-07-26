@@ -95,7 +95,7 @@ export class K8Service {
               {
                 name: "preview",
                 port: 80,
-                targetPort: 5173,
+                targetPort: env.PREVIEW_APP_PORT,
               },
             ],
           },
@@ -236,15 +236,22 @@ export class K8Service {
               },
               {
                 name: "app-runner",
-                image: "oven/bun:alpine",
+                image: env.APP_RUNNER_DOCKER_IMAGE_PATH,
+                env: [
+                  { name: "APP_PORT", value: `${env.APP_RUNNER_PORT}` },
+                  { name: "NODE_ENV", value: env.NODE_ENV },
+                  { name: "APP_DIR", value: "/app" },
+                  { name: "DEV_HOST", value: "0.0.0.0" },
+                  { name: "DEV_PORT", value: `${env.PREVIEW_APP_PORT}` },
+                ],
                 ports: [
                   {
                     name: "preview",
-                    containerPort: 5173,
+                    containerPort: env.PREVIEW_APP_PORT,
                   },
                   {
                     name: "runner-api",
-                    containerPort: 8080,
+                    containerPort: env.APP_RUNNER_PORT,
                   },
                 ],
                 volumeMounts: [
@@ -257,7 +264,6 @@ export class K8Service {
                     mountPath: "/scripts",
                   },
                 ],
-                command: ["bun", "/scripts/app-runner-configmap.cjs"],
               },
             ],
           },
