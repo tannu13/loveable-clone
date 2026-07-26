@@ -7,7 +7,7 @@ const EnvSchema = z.object({
     .string()
     .startsWith("redis://")
     .default("redis://localhost:6379"),
-  K8_NAMESPACE: z.string().default("loveable-clone"),
+  K8S_NAMESPACE: z.string().default("loveable-clone"),
   CONVERSATION_ID: z
     .string()
     // .min(1)

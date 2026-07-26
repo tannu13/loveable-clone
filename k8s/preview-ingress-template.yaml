@@ -1,0 +1,30 @@
+# This file is documentation only. Do not apply it directly.
+#
+# The backend creates one Ingress per conversation through the Kubernetes API.
+# This template shows the shape of that generated resource.
+#
+# To make it applyable manually, replace every placeholder wrapped in __...__.
+# Leaving placeholders in place is intentional so accidental `kubectl apply -f`
+# does not create a misleading preview route.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: __PREVIEW_INGRESS_NAME__ # example: preview-<conversationId>
+  namespace: __K8S_NAMESPACE__ # example: loveable-clone
+  labels:
+    app: conversation-preview
+    conversationId: __CONVERSATION_ID__
+spec:
+  ingressClassName: __INGRESS_CLASS_NAME__ # example: nginx
+  rules:
+    - host: __CONVERSATION_ID__.__PROJECT_PREVIEW_BASE_DOMAIN__
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: __PREVIEW_SERVICE_NAME__ # example: preview-<conversationId>
+                port:
+                  number: 80

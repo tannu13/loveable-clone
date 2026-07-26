@@ -7,12 +7,12 @@ export const createControllers = (service: ConversationService) => {
   const converse = async (req: Request, res: Response) => {
     const { message } = req.body as TConversationSchema;
 
-    const { conversationId } = await service.handleMessage(
+    const { conversationId, previewUrl } = await service.handleMessage(
       message,
       req.params.id as string | undefined,
     );
 
-    return res.status(200).json({ conversationId });
+    return res.status(200).json({ conversationId, previewUrl });
   };
 
   const qnaReply = async (req: Request, res: Response) => {

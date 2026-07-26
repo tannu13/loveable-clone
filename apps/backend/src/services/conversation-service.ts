@@ -40,11 +40,15 @@ export class ConversationService {
       JSON.stringify(messagePayload),
     );
 
-    // td::spin up a pod in k8 cluster with an agent worker (who listens to this job) and project app
-    this.k8Service.ensureWorkspacePVC(conversationId);
-    this.k8Service.ensureConversationPod(conversationId);
+    await this.k8Service.ensureWorkspacePVC(conversationId);
+    await this.k8Service.ensureConversationPod(conversationId);
+    await this.k8Service.ensurePreviewService(conversationId);
+    await this.k8Service.ensurePreviewIngress(conversationId);
 
-    return { conversationId };
+    return {
+      conversationId,
+      previewUrl: this.k8Service.getPreviewUrl(conversationId),
+    };
   }
 
   async handleAnswers(

@@ -7,10 +7,13 @@ const EnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   FRONTEND_URL: z.string().startsWith("http"),
   PROJECT_PREVIEW_URL: z.string().startsWith("http"),
+  PROJECT_PREVIEW_BASE_DOMAIN: z.string().min(1).default("preview.localhost"),
+  PROJECT_PREVIEW_PROTOCOL: z.enum(["http", "https"]).default("http"),
+  K8S_INGRESS_CLASS_NAME: z.string().min(1).default("nginx"),
   DATABASE_URL: z.string().startsWith("postgresql://"),
   REDIS_URL: z.string().startsWith("redis://"),
   CLUSTER_REDIS_ACCESS_URL: z.string().startsWith("redis://"),
-  K8_NAMESPACE: z.string().default("loveable-clone"),
+  K8S_NAMESPACE: z.string().default("loveable-clone"),
   AGENT_DOCKER_IMAGE_PATH: z
     .string()
     .default("tannnu13/loveable-clone-agent:latest"),

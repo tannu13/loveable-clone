@@ -52,6 +52,14 @@ async function fetchRunnerLogsAfterStart() {
   }
 }
 
+/**
+ * main responsibilities
+ * - Download template.
+ * - Run bun install.
+ * - Call runner POST /start.
+ * - Fetch runner status/logs.
+ * - Return everything useful to the LLM.
+ */
 export async function startBuildingApp(library: SupportedLibrary) {
   const templateName = `${library}-starter-template.zip`;
   const workspaceDirectory =

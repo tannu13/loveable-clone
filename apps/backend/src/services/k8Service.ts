@@ -1,13 +1,21 @@
-import { ApiException, CoreV1Api, KubeConfig } from "@kubernetes/client-node";
+import {
+  ApiException,
+  CoreV1Api,
+  KubeConfig,
+  NetworkingV1Api,
+} from "@kubernetes/client-node";
 import env, { isDev } from "../env";
 
 export class K8Service {
   private k8sApi: CoreV1Api;
+  private networkingApi: NetworkingV1Api;
+
   constructor() {
     const kc = new KubeConfig();
     kc.loadFromDefault();
 
     this.k8sApi = kc.makeApiClient(CoreV1Api);
+    this.networkingApi = kc.makeApiClient(NetworkingV1Api);
   }
 
   private getPvcName(conversationId: string): string {
@@ -18,12 +26,24 @@ export class K8Service {
     return "runner-script-config";
   }
 
+  private getPreviewServiceName(conversationId: string): string {
+    return `preview-${conversationId}`;
+  }
+
+  private getPreviewIngressName(conversationId: string): string {
+    return `preview-${conversationId}`;
+  }
+
+  getPreviewUrl(conversationId: string): string {
+    return `${env.PROJECT_PREVIEW_PROTOCOL}://${conversationId}.${env.PROJECT_PREVIEW_BASE_DOMAIN}`;
+  }
+
   async ensureWorkspacePVC(conversationId: string) {
     const pvcName = this.getPvcName(conversationId);
 
     try {
       await this.k8sApi.createNamespacedPersistentVolumeClaim({
-        namespace: env.K8_NAMESPACE,
+        namespace: env.K8S_NAMESPACE,
         body: {
           metadata: {
             name: pvcName,
@@ -51,12 +71,100 @@ export class K8Service {
     }
   }
 
+  async ensurePreviewService(conversationId: string) {
+    const serviceName = this.getPreviewServiceName(conversationId);
+
+    try {
+      await this.k8sApi.createNamespacedService({
+        namespace: env.K8S_NAMESPACE,
+        body: {
+          metadata: {
+            name: serviceName,
+            labels: {
+              app: "conversation-preview",
+              conversationId,
+            },
+          },
+          spec: {
+            type: "ClusterIP",
+            selector: {
+              app: "conversation-space",
+              conversationId,
+            },
+            ports: [
+              {
+                name: "preview",
+                port: 80,
+                targetPort: 5173,
+              },
+            ],
+          },
+        },
+      });
+    } catch (err: any) {
+      if (err instanceof ApiException && err.code === 409) {
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async ensurePreviewIngress(conversationId: string) {
+    const ingressName = this.getPreviewIngressName(conversationId);
+    const serviceName = this.getPreviewServiceName(conversationId);
+    const host = `${conversationId}.${env.PROJECT_PREVIEW_BASE_DOMAIN}`;
+
+    try {
+      await this.networkingApi.createNamespacedIngress({
+        namespace: env.K8S_NAMESPACE,
+        body: {
+          metadata: {
+            name: ingressName,
+            labels: {
+              app: "conversation-preview",
+              conversationId,
+            },
+          },
+          spec: {
+            ingressClassName: env.K8S_INGRESS_CLASS_NAME,
+            rules: [
+              {
+                host,
+                http: {
+                  paths: [
+                    {
+                      path: "/",
+                      pathType: "Prefix",
+                      backend: {
+                        service: {
+                          name: serviceName,
+                          port: {
+                            number: 80,
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+    } catch (err: any) {
+      if (err instanceof ApiException && err.code === 409) {
+        return;
+      }
+      throw err;
+    }
+  }
+
   async ensureConversationPod(conversationId: string) {
     const podName = `conversation-${conversationId}`;
 
     try {
       await this.k8sApi.createNamespacedPod({
-        namespace: env.K8_NAMESPACE,
+        namespace: env.K8S_NAMESPACE,
         body: {
           metadata: {
             name: podName,
@@ -94,7 +202,7 @@ export class K8Service {
                 env: [
                   { name: "NODE_ENV", value: env.NODE_ENV },
                   { name: "REDIS_URL", value: env.CLUSTER_REDIS_ACCESS_URL },
-                  { name: "K8_NAMESPACE", value: env.K8_NAMESPACE },
+                  { name: "K8S_NAMESPACE", value: env.K8S_NAMESPACE },
                   { name: "CONVERSATION_ID", value: conversationId },
                   { name: "GEMINI_API_KEY", value: env.GEMINI_API_KEY },
                   { name: "AWS_REGION", value: "ap-south-1" },
