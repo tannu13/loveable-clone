@@ -1,11 +1,20 @@
 import "dotenv/config";
-import env from "./env";
-import app from "./server";
+import { initializeTelemetry } from "./observability/telemetry";
+async function bootstrap() {
+  await initializeTelemetry();
 
-app
-  .listen(env.APP_PORT, () => {
-    console.log(`Server running on ${env.APP_PORT}`);
-  })
-  .on("error", (err) => {
-    console.error("Listen failed:", err);
-  });
+  const env = (await import("./env")).default;
+  const { default: app } = await import("./server");
+
+  app
+    .listen(env.APP_PORT, () => {
+      console.log(`Server running on ${env.APP_PORT}`);
+    })
+    .on("error", (err) => {
+      console.error("Listen failed:", err);
+    });
+}
+
+bootstrap().catch((err) => {
+  console.error("Failed to start application:", err);
+});
