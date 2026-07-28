@@ -1,5 +1,6 @@
 import {
   ApiException,
+  AppsV1Api,
   CoreV1Api,
   KubeConfig,
   NetworkingV1Api,
@@ -8,6 +9,7 @@ import env from "../env";
 
 export class K8Service {
   private k8sApi: CoreV1Api;
+  private appsApi: AppsV1Api;
   private networkingApi: NetworkingV1Api;
 
   constructor() {
@@ -15,6 +17,7 @@ export class K8Service {
     kc.loadFromDefault();
 
     this.k8sApi = kc.makeApiClient(CoreV1Api);
+    this.appsApi = kc.makeApiClient(AppsV1Api);
     this.networkingApi = kc.makeApiClient(NetworkingV1Api);
   }
 
@@ -155,103 +158,130 @@ export class K8Service {
     }
   }
 
-  async ensureConversationPod(conversationId: string) {
-    const podName = `conversation-${conversationId}`;
+  async ensureConversationDeployment(conversationId: string) {
+    const deploymentName = `conversation-${conversationId}`;
 
     try {
-      await this.k8sApi.createNamespacedPod({
+      await this.appsApi.createNamespacedDeployment({
         namespace: env.K8S_NAMESPACE,
         body: {
           metadata: {
-            name: podName,
+            name: deploymentName,
+            namespace: env.K8S_NAMESPACE,
             labels: {
               app: "conversation-space",
               conversationId,
             },
           },
           spec: {
-            serviceAccountName: "agent-runner-sa", // RBAC ServiceAccount
-            volumes: [
-              {
-                name: "workspace-storage",
-                persistentVolumeClaim: {
-                  claimName: this.getPvcName(conversationId), // Links to the PVC
+            replicas: 1,
+            strategy: {
+              type: "Recreate", // Kills old Pod first so PVC is unlocked before new Pod starts
+            },
+            selector: {
+              matchLabels: {
+                app: "conversation-space",
+                conversationId: conversationId,
+              },
+            },
+            template: {
+              metadata: {
+                labels: {
+                  app: "conversation-space",
+                  conversationId: conversationId,
                 },
               },
-            ],
-            containers: [
-              {
-                name: "agent-worker",
-                image: env.AGENT_DOCKER_IMAGE_PATH,
-                volumeMounts: [
+              spec: {
+                serviceAccountName: "agent-runner-sa", // RBAC ServiceAccount
+                volumes: [
                   {
                     name: "workspace-storage",
-                    mountPath: "/workspace", // Agent writes code here
+                    persistentVolumeClaim: {
+                      claimName: this.getPvcName(conversationId), // Links to the PVC
+                    },
                   },
                 ],
-                env: [
-                  { name: "NODE_ENV", value: env.NODE_ENV },
-                  { name: "REDIS_URL", value: env.CLUSTER_REDIS_ACCESS_URL },
-                  { name: "K8S_NAMESPACE", value: env.K8S_NAMESPACE },
-                  { name: "CONVERSATION_ID", value: conversationId },
-                  { name: "GEMINI_API_KEY", value: env.GEMINI_API_KEY },
-                  { name: "AWS_REGION", value: "ap-south-1" },
-                  { name: "AWS_ACCESS_KEY_ID", value: "fake-local-key" },
-                  { name: "AWS_SECRET_ACCESS_KEY", value: "fake-local-secret" },
+                containers: [
                   {
-                    name: "MINIO_ENDPOINT",
-                    value: "http://host.minikube.internal:9000",
+                    name: "agent-worker",
+                    image: env.AGENT_DOCKER_IMAGE_PATH,
+                    volumeMounts: [
+                      {
+                        name: "workspace-storage",
+                        mountPath: "/workspace", // Agent writes code here
+                      },
+                    ],
+                    env: [
+                      { name: "NODE_ENV", value: env.NODE_ENV },
+                      {
+                        name: "REDIS_URL",
+                        value: env.CLUSTER_REDIS_ACCESS_URL,
+                      },
+                      { name: "K8S_NAMESPACE", value: env.K8S_NAMESPACE },
+                      { name: "CONVERSATION_ID", value: conversationId },
+                      { name: "GEMINI_API_KEY", value: env.GEMINI_API_KEY },
+                      { name: "AWS_REGION", value: "ap-south-1" },
+                      { name: "AWS_ACCESS_KEY_ID", value: "fake-local-key" },
+                      {
+                        name: "AWS_SECRET_ACCESS_KEY",
+                        value: "fake-local-secret",
+                      },
+                      {
+                        name: "MINIO_ENDPOINT",
+                        value: "http://host.minikube.internal:9000",
+                      },
+                      {
+                        name: "AWS_CHAT_BUCKET_NAME",
+                        value:
+                          "s30-loveable-clone-chat-bucket-410940411202-ap-south-1-an",
+                      },
+                      {
+                        name: "AWS_STARTER_TEMPLATES_BUCKET_NAME",
+                        value:
+                          "s30-loveable-startertemplates-bucket-410940411202-ap-south-1-an",
+                      },
+                      { name: "WORKSPACE_DIR", value: "/workspace" },
+                      {
+                        name: "DATABASE_URL",
+                        value:
+                          "postgresql://perps_user:mysecretpasswordfordb@host.minikube.internal:5432/loveable_clone",
+                      },
+                      {
+                        name: "APP_RUNNER_BASE_URL",
+                        value: "http://127.0.0.1:8080",
+                      },
+                    ],
                   },
                   {
-                    name: "AWS_CHAT_BUCKET_NAME",
-                    value:
-                      "s30-loveable-clone-chat-bucket-410940411202-ap-south-1-an",
-                  },
-                  {
-                    name: "AWS_STARTER_TEMPLATES_BUCKET_NAME",
-                    value:
-                      "s30-loveable-startertemplates-bucket-410940411202-ap-south-1-an",
-                  },
-                  { name: "WORKSPACE_DIR", value: "/workspace" },
-                  {
-                    name: "DATABASE_URL",
-                    value:
-                      "postgresql://perps_user:mysecretpasswordfordb@host.minikube.internal:5432/loveable_clone",
-                  },
-                  {
-                    name: "APP_RUNNER_BASE_URL",
-                    value: "http://127.0.0.1:8080",
+                    name: "app-runner",
+                    image: env.APP_RUNNER_DOCKER_IMAGE_PATH,
+                    env: [
+                      { name: "APP_PORT", value: `${env.APP_RUNNER_PORT}` },
+                      { name: "NODE_ENV", value: env.NODE_ENV },
+                      { name: "APP_DIR", value: "/user-app" },
+                      { name: "DEV_HOST", value: "0.0.0.0" },
+                      { name: "DEV_PORT", value: `${env.PREVIEW_APP_PORT}` },
+                    ],
+                    ports: [
+                      {
+                        name: "preview",
+                        containerPort: env.PREVIEW_APP_PORT,
+                      },
+                      {
+                        name: "runner-api",
+                        containerPort: env.APP_RUNNER_PORT,
+                      },
+                    ],
+                    volumeMounts: [
+                      {
+                        name: "workspace-storage",
+                        mountPath: "/user-app", // Runner reads code from here
+                      },
+                    ],
                   },
                 ],
               },
-              {
-                name: "app-runner",
-                image: env.APP_RUNNER_DOCKER_IMAGE_PATH,
-                env: [
-                  { name: "APP_PORT", value: `${env.APP_RUNNER_PORT}` },
-                  { name: "NODE_ENV", value: env.NODE_ENV },
-                  { name: "APP_DIR", value: "/user-app" },
-                  { name: "DEV_HOST", value: "0.0.0.0" },
-                  { name: "DEV_PORT", value: `${env.PREVIEW_APP_PORT}` },
-                ],
-                ports: [
-                  {
-                    name: "preview",
-                    containerPort: env.PREVIEW_APP_PORT,
-                  },
-                  {
-                    name: "runner-api",
-                    containerPort: env.APP_RUNNER_PORT,
-                  },
-                ],
-                volumeMounts: [
-                  {
-                    name: "workspace-storage",
-                    mountPath: "/user-app", // Runner reads code from here
-                  },
-                ],
-              },
-            ],
+            },
           },
         },
       });

@@ -41,7 +41,7 @@ export class ConversationService {
     );
 
     await this.k8Service.ensureWorkspacePVC(conversationId);
-    await this.k8Service.ensureConversationPod(conversationId);
+    await this.k8Service.ensureConversationDeployment(conversationId);
     await this.k8Service.ensurePreviewService(conversationId);
     await this.k8Service.ensurePreviewIngress(conversationId);
 

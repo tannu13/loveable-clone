@@ -7,7 +7,7 @@ const EnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   FRONTEND_URL: z.string().startsWith("http"),
   PROJECT_PREVIEW_URL: z.string().startsWith("http"),
-  PROJECT_PREVIEW_BASE_DOMAIN: z.string().min(1).default("lvh.me"),
+  PROJECT_PREVIEW_BASE_DOMAIN: z.string().min(1).default("preview.local"),
   PROJECT_PREVIEW_PROTOCOL: z.enum(["http", "https"]).default("http"),
   K8S_INGRESS_CLASS_NAME: z.string().min(1).default("nginx"),
   DATABASE_URL: z.string().startsWith("postgresql://"),
