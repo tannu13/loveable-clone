@@ -1,6 +1,14 @@
 services:
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infra/tempo.yaml:/etc/tempo.yaml
+    ports:
+      - "3200:3200"
+
   otel-collector:
-    image: otel/opentelemetry-collector:latest
+    image: otel/opentelemetry-collector:0.131.1
     volumes:
       - ./infra/otel-collector-config.yaml:/etc/otelcol/config.yaml
     command:
@@ -8,3 +16,8 @@ services:
     ports:
       - "4317:4317" # OTLP gRPC
       - "4318:4318" # OTLP HTTP
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
