@@ -1,159 +1,224 @@
-# Turborepo starter
+# Loveable Clone
 
-This Turborepo starter is maintained by the Turborepo core team.
+Loveable Clone is a lightweight coding-agent platform. Each conversation gets its own isolated Kubernetes workspace, user prompts are persisted before agent work starts, jobs are processed asynchronously through Redis, and live progress is streamed back to the browser while the agent edits project files.
 
-## Using this example
+The system has moved beyond a simple chat application: it now coordinates a backend API, WebSocket updates, a redis queue job pipeline, Kubernetes conversation pods, an agent worker, an app runner, Postgres persistence, and shared project volumes.
 
-Run the following command:
+## Current Capabilities
 
-```sh
-npx create-turbo@latest
+- Create conversations and store them in Postgres.
+- Accept user messages and persist them immediately so prompts are not lost if agent execution fails later.
+- Create or reuse a dedicated Kubernetes pod for each conversation.
+- Inject environment variables, mount a shared PVC, and start the agent and app-runner containers inside the pod.
+- Queue work through Redis so messages are not lost while pods are starting.
+- Run an agent worker that loads conversation history, reads and edits project files, invokes Gemini/tooling, saves assistant messages, and publishes progress.
+- Run a separate app-runner container that manages the generated application's dev server.
+- Stream real-time status updates through Redis Pub/Sub, backend subscriptions, WebSockets, and the browser.
+- Persist conversation history in Postgres so pods can be recreated and context can be restored from the database.
+- Expose generated app previews through Kubernetes Services and Ingress.
+
+---
+
+## System Architecture
+
+The ecosystem consists of several specialized microservices built on k8s cluster communicating via event driven messages:
+![alt text](loveable-systems-design.png)
+
+```text
+                    Browser
+                       |
+                HTTP + WebSocket
+                       |
+                 Backend API
+                       |
+        +--------------+--------------+
+        |                             |
+ Save conversation              Subscribe to
+   in Postgres                  Redis Pub/Sub
+        |                             |
+        +--------------+--------------+
+                       |
+       Ensure conversation pod exists
+                       |
+                  Redis Queue
+                       |
+                  Agent Worker
+                       |
+          Kubernetes conversation pod
+                       |
+      +----------------+----------------+
+      |                                 |
+ Agent Worker Container          App Runner Container
+      |                                 |
+ Gemini + tools                  bun install
+ Edit files                      bun run dev
+ Save messages                   restart on file changes
+ Publish progress                expose preview server
+      |                                 |
+      +---------- Shared Volume --------+
+                       |
+            App Runner Dev Server
+                       |
+              Kubernetes Service
+                       |
+                    Ingress
+                       |
+        conversation-id.preview.local
 ```
 
-## What's inside?
+## Request Flow
 
-This Turborepo includes the following packages/apps:
+```text
+User
+ |
+ | POST /messages
+ v
 
-### Apps and Packages
+Backend
+ |
+ +-- Save conversation
+ +-- Save user message
+ +-- Ensure Kubernetes pod exists
+ +-- Push job to Redis queue
+ +-- Return immediately
+         |
+         v
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+Agent Worker
+ |
+ +-- Pick job from Redis queue
+ +-- Load conversation history
+ +-- Run Gemini
+ +-- Execute tools
+ +-- Write files
+ +-- Save assistant messages
+ +-- Publish progress
+         |
+         v
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+Redis Pub/Sub
+         |
+         v
+Backend
+         |
+         v
+WebSocket
+         |
+         v
+Browser receives live updates
 ```
 
-Without global `turbo`, use your package manager:
+## App Runner
 
-```sh
-cd my-turborepo
-npx turbo build
-bun dlx turbo build
-bun exec turbo build
+The app runner is a dedicated container in the same pod as the agent. It is responsible only for running the editable application, not for agent logic.
+
+It watches the shared project directory, runs dependency installation, starts `bun run dev`, restarts automatically when files change, exposes the dev server, and provides a preview URL through ingress.
+
+The agent edits files directly on the shared volume. It does not start or manage the dev server itself.
+
+## Repository Layout
+
+```text
+apps/
+  agent/              Agent worker that processes queued jobs and edits projects
+  app-runner/         Container process that installs and runs generated apps
+  backend/            Express API for conversations, messages, queues, and pods
+  frontend/           React/Vite frontend for the user-facing app
+  project/            Editable React/Vite project workspace
+  project-template/   Template used for new editable projects
+  websocket/          WebSocket server for live browser updates
+
+packages/
+  db/                 Drizzle/Postgres schema and database access
+  shared/             Shared types, schemas, and utilities
+
+infra/                Observability configuration, including Tempo and OTel collector
+k8s/                  Kubernetes namespace, RBAC, PVC inspection, and ingress templates
+ops/                  Dockerfiles for agent and app-runner containers
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Technology Stack
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+| Layer                   | Technology                                              |
+| ----------------------- | ------------------------------------------------------- |
+| Frontend                | React, Vite                                             |
+| API                     | Express, TypeScript                                     |
+| Database                | PostgreSQL, Drizzle ORM                                 |
+| Queue                   | Redis                                                   |
+| Live events             | Redis Pub/Sub, WebSockets                               |
+| AI                      | Gemini                                                  |
+| Runtime/package manager | Bun                                                     |
+| Containers              | Docker                                                  |
+| Orchestration           | Kubernetes, currently Minikube                          |
+| Workspace               | Shared volume inside each conversation pod              |
+| Networking              | Kubernetes Services and Ingress                         |
+| Observability           | OpenTelemetry, Tempo, Grafana configuration in progress |
 
-```sh
-turbo build --filter=docs
-```
+## Local Development
 
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
+Install dependencies:
 
 ```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
+bun install
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Run all workspace dev tasks through Turborepo:
 
 ```sh
-turbo dev --filter=web
+bun run dev
 ```
 
-Without global `turbo`:
+Run the root checks:
 
 ```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
+bun run build
+bun run lint
+bun run check-types
 ```
 
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Run database commands from the database package:
 
 ```sh
-cd my-turborepo
-turbo login
+bun --filter @repo/db db:generate
+bun --filter @repo/db db:push
+bun --filter @repo/db db:migrate
+bun --filter @repo/db db:studio
 ```
 
-Without global `turbo`, use your package manager:
+Start the local observability stack:
 
 ```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
+docker compose up
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+This starts Tempo, the OpenTelemetry Collector, and Grafana using the configuration in `infra/`.
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## Kubernetes
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+The Kubernetes setup is designed around one isolated pod per conversation. The backend ensures the pod exists before queueing work for the agent. Each pod contains:
 
-```sh
-turbo link
-```
+- an agent worker container
+- an app-runner container
+- a shared volume for project files
+- service/ingress routing for preview access
 
-Without global `turbo`:
+Relevant manifests and templates live in `k8s/`, while container build definitions live in `ops/`.
 
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
+## Design Decisions
 
-## Useful Links
+- Conversation history is stored in Postgres, not in process memory.
+- User messages are saved before agent execution starts.
+- Agent work is asynchronous and queued through Redis.
+- Each conversation gets an isolated Kubernetes execution environment.
+- The agent and app runner communicate through a shared filesystem, not file copying.
+- Live progress is published through Redis Pub/Sub and forwarded over WebSockets.
+- Crash recovery works by recreating the pod and reloading state from the database.
 
-Learn more about the power of Turborepo:
+## Roadmap
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Near-term areas called out for the project:
+
+- Observability with OpenTelemetry SDKs, OTLP export, collector configuration, Loki logs, Prometheus metrics, Grafana dashboards, and distributed tracing.
+- Sub agent orchestration via the main agent for context isolation.
+- Faster local developer workflow, including better Minikube ergonomics and potentially hostPath mounts for the inner loop.
+- Production readiness work such as authentication, authorization, secrets management, autoscaling, resource limits, retry/dead-letter handling, and WebSocket scaling across multiple backend replicas.
