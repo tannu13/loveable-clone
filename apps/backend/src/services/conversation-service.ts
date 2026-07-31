@@ -2,6 +2,7 @@ import { saveConversation, saveMessage } from "../models/conversation-model";
 import type { RedisClientType } from "redis";
 import type { K8Service } from "./k8sService";
 import type { TRedisMessageSchema } from "@repo/shared";
+import { setSpanAttributes, withActiveSpan } from "@repo/observability";
 
 export class ConversationService {
   private publisher: RedisClientType;
@@ -25,25 +26,36 @@ export class ConversationService {
       type: "text",
     } as const;
 
-    conversationId = conversationId
-      ? await saveMessage(conversationId as string, payload)
-      : await saveConversation(payload);
+    if (conversationId) {
+      setSpanAttributes({
+        "conversation.id": conversationId,
+      });
+    }
 
-    // create job for this and push it to agent process via redis
-    const messagePayload: TRedisMessageSchema = {
-      conversationId,
-      type: "text",
-      message,
-    };
-    await this.publisher.lPush(
-      `convo-request-${conversationId}`,
-      JSON.stringify(messagePayload),
-    );
+    conversationId = await withActiveSpan("message.save", async () => {
+      return conversationId
+        ? await saveMessage(conversationId as string, payload)
+        : await saveConversation(payload);
+    });
 
-    await this.k8Service.ensureWorkspacePVC(conversationId);
-    await this.k8Service.ensureConversationDeployment(conversationId);
-    await this.k8Service.ensurePreviewService(conversationId);
-    await this.k8Service.ensurePreviewIngress(conversationId);
+    setSpanAttributes({
+      "conversation.id": conversationId,
+    });
+
+    await withActiveSpan("redis.push", async () => {
+      // create job for this and push it to agent process via redis
+      const messagePayload: TRedisMessageSchema = {
+        conversationId,
+        type: "text",
+        message,
+      };
+      await this.publisher.lPush(
+        `convo-request-${conversationId}`,
+        JSON.stringify(messagePayload),
+      );
+    });
+
+    this.k8Service.ensureInfrastructure(conversationId);
 
     return {
       conversationId,

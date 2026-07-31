@@ -1,9 +1,15 @@
 import "dotenv/config";
-import { initializeTelemetry } from "./observability/telemetry";
+import { initializeTracing } from "@repo/observability";
 async function bootstrap() {
-  await initializeTelemetry();
-
   const env = (await import("./env")).default;
+
+  initializeTracing({
+    serviceName: "backend",
+    serviceVer: "0.0.1",
+    env: env.NODE_ENV,
+    exporterUrl: env.OTEL_EXPORTER_OTLP_ENDPOINT,
+  });
+
   const { default: app } = await import("./server");
 
   app

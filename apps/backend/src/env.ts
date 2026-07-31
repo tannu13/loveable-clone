@@ -22,6 +22,7 @@ const EnvSchema = z.object({
     .default("tannnu13/loveable-clone-app-runner:latest"),
   APP_RUNNER_PORT: z.coerce.number().positive().default(8080),
   PREVIEW_APP_PORT: z.coerce.number().positive().default(5174),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().min(1),
 });
 
 type Env = z.infer<typeof EnvSchema>;

@@ -6,6 +6,7 @@ import {
   NetworkingV1Api,
 } from "@kubernetes/client-node";
 import env from "../env";
+import { withActiveSpan } from "@repo/observability";
 
 export class K8Service {
   private k8sApi: CoreV1Api;
@@ -35,6 +36,15 @@ export class K8Service {
 
   getPreviewUrl(conversationId: string): string {
     return `${env.PROJECT_PREVIEW_PROTOCOL}://${conversationId}.${env.PROJECT_PREVIEW_BASE_DOMAIN}`;
+  }
+
+  async ensureInfrastructure(conversationId: string) {
+    await withActiveSpan("k8s-cluster.ensure", async () => {
+      this.ensureWorkspacePVC(conversationId);
+      this.ensureConversationDeployment(conversationId);
+      this.ensurePreviewService(conversationId);
+      this.ensurePreviewIngress(conversationId);
+    });
   }
 
   async ensureWorkspacePVC(conversationId: string) {

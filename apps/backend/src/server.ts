@@ -5,7 +5,7 @@ import express, {
 } from "express";
 import cors from "cors";
 import env from "./env";
-import type { Message, ProjectSnapshot } from "@repo/shared";
+import type { Message } from "@repo/shared";
 import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
