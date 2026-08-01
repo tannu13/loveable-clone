@@ -9,15 +9,26 @@ import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 
-export function initializeTracing(config: {
+export function initializeObservability(config: {
   serviceName: string;
   serviceVer: string;
   env: "development" | "staging" | "production";
   exporterUrl: string;
 }) {
-  const exporter = new OTLPTraceExporter({
-    url: config.exporterUrl,
+  const traceExporter = new OTLPTraceExporter({
+    url: `${config.exporterUrl}/v1/traces`,
+  });
+
+  const metricExporter = new OTLPMetricExporter({
+    url: `${config.exporterUrl}/v1/metrics`,
+  });
+
+  const metricReader = new PeriodicExportingMetricReader({
+    exporter: metricExporter,
+    exportIntervalMillis: 15000, // Export interval every 15 secs
   });
 
   const sdk = new NodeSDK({
@@ -26,7 +37,8 @@ export function initializeTracing(config: {
       [ATTR_SERVICE_VERSION]: config.serviceVer,
       [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: config.env,
     }),
-    spanProcessors: [new BatchSpanProcessor(exporter)],
+    spanProcessors: [new BatchSpanProcessor(traceExporter)],
+    metricReaders: [metricReader],
     instrumentations: [
       getNodeAutoInstrumentations({
         "@opentelemetry/instrumentation-fs": {

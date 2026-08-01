@@ -1,9 +1,9 @@
 import "dotenv/config";
-import { initializeTracing } from "@repo/observability";
+import { initializeObservability } from "@repo/observability";
 async function bootstrap() {
   const env = (await import("./env")).default;
 
-  initializeTracing({
+  initializeObservability({
     serviceName: "backend",
     serviceVer: "0.0.1",
     env: env.NODE_ENV,
