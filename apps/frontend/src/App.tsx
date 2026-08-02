@@ -11,6 +11,7 @@ import {
 import { QnAMessage } from "./components/QnAMessage";
 import { useConversationStream } from "./hooks/useConversationStream";
 import { isPlanComplete, PlanMessage } from "./components/PlanMessage";
+import { apiFetch } from "./lib/api";
 
 type ViewMode = "code" | "preview";
 
@@ -30,7 +31,7 @@ type FileTreeRow =
     };
 
 async function fetchProjectSnapshot(): Promise<ProjectSnapshot> {
-  const response = await fetch("/api/project");
+  const response = await apiFetch("/api/project");
 
   if (!response.ok) {
     throw new Error(`Failed to load project: ${response.status}`);

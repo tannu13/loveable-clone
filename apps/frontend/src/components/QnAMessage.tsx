@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiFetch } from "../lib/api";
 
 type QnAQuestion = {
   inputType: "select";
@@ -119,7 +120,7 @@ async function sendUserReply({
   answers: UserAnswer[];
   correlationId: string;
 }) {
-  const response = await fetch("/api/user-reply", {
+  const response = await apiFetch("/api/user-reply", {
     body: JSON.stringify({ answers, correlationId }),
     headers: {
       "Content-Type": "application/json",

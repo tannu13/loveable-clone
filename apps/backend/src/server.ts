@@ -9,6 +9,7 @@ import type { Message } from "@repo/shared";
 import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
+import { createSessionRoutes } from "./routes/session-routes";
 import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
 import { K8Service } from "./services/k8sService";
@@ -57,7 +58,9 @@ app.get("/health", (_req: Request, res: Response) => {
 //   response.status(200).json(ps);
 // });
 
+const { sessionRouter } = createSessionRoutes();
 const { convoRouter } = createRoutes(controllers);
+app.use(sessionRouter);
 app.use(convoRouter);
 
 // app.post(

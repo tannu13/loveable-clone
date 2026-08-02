@@ -1,5 +1,6 @@
 import type { Message } from "@repo/shared";
 import { useCallback, useRef, useState } from "react";
+import { apiFetch } from "../lib/api";
 
 type ConversationStreamOptions = {
   onComplete?: () => Promise<void> | void;
@@ -137,7 +138,7 @@ export function useConversationStream() {
       });
 
       try {
-        const response = await fetch("/api/conversation", {
+        const response = await apiFetch("/api/conversation", {
           body: JSON.stringify({ message: trimmedMessage }),
           headers: {
             "Content-Type": "application/json",
