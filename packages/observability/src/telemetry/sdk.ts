@@ -61,7 +61,7 @@ export function initializeObservability(config: {
 
   sdk.start();
 
-  initializeMetrics();
+  initializeMetrics(config.serviceName);
 
   return sdk;
 }
