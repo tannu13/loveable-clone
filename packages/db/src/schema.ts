@@ -1,5 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
+  index,
   jsonb,
   pgEnum,
   pgTable,
@@ -9,15 +11,33 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-export const conversations = pgTable("conversations", {
+export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  title: varchar("title", { length: 255 }),
+  username: varchar("username", { length: 255 }).unique(),
+  isAnonymous: boolean("is_anonymous").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
 });
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    title: varchar("title", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index("conversations_user_id_idx").on(table.userId)],
+);
 
 export const messageRoleEnum = pgEnum("role", ["user", "assistant"]);
 export type TMessageRoleEnum = (typeof messageRoleEnum.enumValues)[number];
@@ -41,9 +61,20 @@ export const messageHistory = pgTable("message_history", {
     .$onUpdate(() => new Date()),
 });
 
-export const conversationRelations = relations(conversations, ({ many }) => ({
-  messageHistory: many(messageHistory),
+export const userRelations = relations(users, ({ many }) => ({
+  conversations: many(conversations),
 }));
+
+export const conversationRelations = relations(
+  conversations,
+  ({ many, one }) => ({
+    user: one(users, {
+      fields: [conversations.userId],
+      references: [users.id],
+    }),
+    messageHistory: many(messageHistory),
+  }),
+);
 
 export const messageHistoryRelations = relations(messageHistory, ({ one }) => ({
   conversation: one(conversations, {

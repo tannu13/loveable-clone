@@ -1,4 +1,8 @@
-import { saveConversation, saveMessage } from "../models/conversation-model";
+import {
+  assertConversationBelongsToUser,
+  saveConversation,
+  saveMessage,
+} from "../models/conversation-model";
 import type { RedisClientType } from "redis";
 import type { K8Service } from "./k8sService";
 import type { TRedisMessageSchema } from "@repo/shared";
@@ -19,7 +23,11 @@ export class ConversationService {
     this.k8Service = k8Service;
   }
 
-  async handleMessage(message: string, conversationId?: string) {
+  async handleMessage(
+    message: string,
+    userId: string,
+    conversationId?: string,
+  ) {
     const payload = {
       content: message,
       role: "user",
@@ -29,13 +37,14 @@ export class ConversationService {
     if (conversationId) {
       setSpanAttributes({
         "conversation.id": conversationId,
+        "user.id": userId,
       });
     }
 
     conversationId = await withActiveSpan("message.save", async () => {
       return conversationId
-        ? await saveMessage(conversationId as string, payload)
-        : await saveConversation(payload);
+        ? await saveMessage(conversationId, userId, payload)
+        : await saveConversation({ ...payload, userId });
     });
 
     setSpanAttributes({
@@ -65,9 +74,12 @@ export class ConversationService {
 
   async handleAnswers(
     conversationId: string,
+    userId: string,
     correlationId: string,
     answers: unknown,
   ) {
+    await assertConversationBelongsToUser(conversationId, userId);
+
     const answerPayload: TRedisMessageSchema = {
       conversationId,
       type: "qna",

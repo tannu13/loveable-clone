@@ -21,6 +21,12 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(message = "Unauthorized", errorCode = "UNAUTHORIZED") {
+    super(message, 401, errorCode);
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(message = "Internal Server Error") {
     super(message, 500, "SERVER_ERROR");
