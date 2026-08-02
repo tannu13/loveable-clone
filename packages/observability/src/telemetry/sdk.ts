@@ -11,6 +11,7 @@ import {
 } from "@opentelemetry/semantic-conventions";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { initializeMetrics } from "./metrics";
 
 export function initializeObservability(config: {
   serviceName: string;
@@ -59,6 +60,8 @@ export function initializeObservability(config: {
   });
 
   sdk.start();
+
+  initializeMetrics();
 
   return sdk;
 }

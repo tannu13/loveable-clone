@@ -12,6 +12,7 @@ import { createRoutes } from "./routes/conversation-routes";
 import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
 import { K8Service } from "./services/k8sService";
+import { addHttpMetrics } from "./middlewares/http-metrics";
 
 const redisClient = await setupComms();
 const k8Service = new K8Service();
@@ -31,8 +32,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use(addHttpMetrics);
+
 app.get("/health", (_req: Request, res: Response) => {
-  return res.json({
+  return res.status(200).json({
     ok: true,
   });
 });

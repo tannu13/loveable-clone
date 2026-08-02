@@ -1,3 +1,4 @@
-export { initializeObservability } from "./tracing/sdk";
-export { getTracer, setSpanAttributes } from "./tracing/tracer";
-export { withActiveSpan } from "./tracing/spans";
+export { initializeObservability } from "./telemetry/sdk";
+export { getTracer, setSpanAttributes } from "./telemetry/tracer";
+export { withActiveSpan } from "./telemetry/spans";
+export { incrementRequestCounter } from "./telemetry/metrics";
