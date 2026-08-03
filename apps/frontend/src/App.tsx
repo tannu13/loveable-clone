@@ -12,6 +12,13 @@ import { QnAMessage } from "./components/QnAMessage";
 import { useConversationStream } from "./hooks/useConversationStream";
 import { isPlanComplete, PlanMessage } from "./components/PlanMessage";
 import { apiFetch } from "./lib/api";
+import {
+  claimAccount,
+  getStoredIdentity,
+  signInWithUsername,
+  type UserIdentity,
+} from "./lib/identity";
+import { bootstrapSession, hasStoredSessionToken } from "./lib/session";
 
 type ViewMode = "code" | "preview";
 
@@ -78,11 +85,16 @@ function buildFileTreeRows(files: ProjectFile[]): FileTreeRow[] {
 }
 
 export function App() {
+  const [hasSession, setHasSession] = useState(() => hasStoredSessionToken());
   const [viewMode, setViewMode] = useState<ViewMode>("code");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [previewReloadKey, setPreviewReloadKey] = useState(0);
+  const [identity, setIdentity] = useState<UserIdentity>(() =>
+    getStoredIdentity(),
+  );
 
   const projectQuery = useQuery({
+    enabled: hasSession,
     queryKey: ["project"],
     queryFn: fetchProjectSnapshot,
   });
@@ -145,6 +157,18 @@ export function App() {
     },
     [conversationStream, refreshProject],
   );
+
+  const handleIdentityChange = useCallback(
+    (nextIdentity: UserIdentity) => {
+      setIdentity(nextIdentity);
+      void projectQuery.refetch();
+    },
+    [projectQuery],
+  );
+
+  if (!hasSession) {
+    return <LandingPage onStart={() => setHasSession(true)} />;
+  }
 
   return (
     <main className="h-dvh overflow-hidden bg-(--app-bg) text-(--text)">
@@ -217,13 +241,63 @@ export function App() {
 
           <ChatPanel
             error={conversationStream.error}
+            identity={identity}
             isLoading={projectQuery.isLoading}
             isStreaming={conversationStream.isStreaming}
             messages={displayedMessages}
+            onIdentityChange={handleIdentityChange}
             onSendMessage={handleSendMessage}
           />
         </div>
       </div>
+    </main>
+  );
+}
+
+function LandingPage({ onStart }: { onStart: () => void }) {
+  const [error, setError] = useState<Error | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+
+  const handleStart = async () => {
+    if (isStarting) {
+      return;
+    }
+
+    setError(null);
+    setIsStarting(true);
+
+    try {
+      await bootstrapSession();
+      onStart();
+    } catch (startError) {
+      setError(
+        startError instanceof Error
+          ? startError
+          : new Error("Failed to start session"),
+      );
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  return (
+    <main className="grid min-h-dvh place-items-center bg-(--app-bg) px-4 text-(--text)">
+      <section className="w-full max-w-xl text-center">
+        <h1 className="text-4xl font-semibold sm:text-5xl">
+          Build apps with AI
+        </h1>
+        <button
+          className="mt-8 h-11 rounded-lg bg-(--accent) px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={isStarting}
+          onClick={handleStart}
+          type="button"
+        >
+          {isStarting ? "Starting" : "Start Building"}
+        </button>
+        {error ? (
+          <p className="mt-4 text-sm leading-6 text-red-500">{error.message}</p>
+        ) : null}
+      </section>
     </main>
   );
 }
@@ -387,15 +461,19 @@ function PreviewWorkspace({
 
 function ChatPanel({
   error,
+  identity,
   isLoading,
   isStreaming,
   messages,
+  onIdentityChange,
   onSendMessage,
 }: {
   error: Error | null;
+  identity: UserIdentity;
   isLoading: boolean;
   isStreaming: boolean;
   messages: Message[];
+  onIdentityChange: (identity: UserIdentity) => void;
   onSendMessage: (message: string) => void;
 }) {
   const [prompt, setPrompt] = useState("");
@@ -421,6 +499,8 @@ function ChatPanel({
 
   return (
     <aside className="flex min-h-0 flex-col overflow-hidden border-t border-(--border) bg-(--panel) lg:border-l lg:border-t-0">
+      <IdentityPanel identity={identity} onIdentityChange={onIdentityChange} />
+
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) px-4">
         <div>
           <h2 className="text-sm font-semibold">Assistant</h2>
@@ -483,6 +563,172 @@ function ChatPanel({
         </div>
       </form>
     </aside>
+  );
+}
+
+function IdentityPanel({
+  identity,
+  onIdentityChange,
+}: {
+  identity: UserIdentity;
+  onIdentityChange: (identity: UserIdentity) => void;
+}) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const displayName = identity.isAnonymous
+    ? "Anonymous User"
+    : (identity.username ?? "User");
+
+  return (
+    <>
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-(--control) text-base">
+            🙂
+          </span>
+          <span className="truncate text-sm font-medium">{displayName}</span>
+        </div>
+        {identity.isAnonymous ? (
+          <button
+            className="h-8 shrink-0 rounded-md border border-(--border) bg-(--control) px-3 text-xs font-semibold text-(--text) transition hover:bg-(--control-active)"
+            onClick={() => setIsDialogOpen(true)}
+            type="button"
+          >
+            Claim Account
+          </button>
+        ) : null}
+      </div>
+
+      {isDialogOpen ? (
+        <UsernameDialog
+          onComplete={(nextIdentity) => {
+            onIdentityChange(nextIdentity);
+            setIsDialogOpen(false);
+          }}
+          onClose={() => setIsDialogOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function UsernameDialog({
+  onComplete,
+  onClose,
+}: {
+  onComplete: (identity: UserIdentity) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<"claim" | "signin">("claim");
+  const [username, setUsername] = useState("");
+  const [error, setError] = useState<Error | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = username.trim().length >= 3 && !isSubmitting;
+  const isClaimMode = mode === "claim";
+
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
+    event.preventDefault();
+
+    if (!canSubmit) {
+      return;
+    }
+
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const identity = isClaimMode
+        ? await claimAccount(username)
+        : await signInWithUsername(username);
+      onComplete(identity);
+    } catch (claimError) {
+      setError(
+        claimError instanceof Error
+          ? claimError
+          : new Error("Failed to claim account"),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 px-4">
+      <form
+        className="w-full max-w-sm rounded-lg border border-(--border) bg-(--panel) p-4 shadow-xl"
+        onSubmit={handleSubmit}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-base font-semibold">Account</h2>
+          <button
+            aria-label="Close"
+            className="grid size-8 shrink-0 place-items-center rounded-md text-(--muted) transition hover:bg-(--control) hover:text-(--text)"
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+          >
+            x
+          </button>
+        </div>
+
+        <div className="mt-4 grid h-9 grid-cols-2 rounded-lg border border-(--border) bg-(--control) p-1 text-sm">
+          {(["claim", "signin"] as const).map((tab) => (
+            <button
+              className={`rounded-md font-medium transition ${
+                mode === tab
+                  ? "bg-(--control-active) text-(--text) shadow-sm"
+                  : "text-(--muted) hover:text-(--text)"
+              }`}
+              disabled={isSubmitting}
+              key={tab}
+              onClick={() => {
+                setMode(tab);
+                setError(null);
+              }}
+              type="button"
+            >
+              {tab === "claim" ? "Sign Up" : "Sign In"}
+            </button>
+          ))}
+        </div>
+
+        <label className="sr-only" htmlFor="username">
+          Username
+        </label>
+        <input
+          autoFocus
+          className="mt-4 h-10 w-full rounded-md border border-(--border) bg-(--control) px-3 text-sm text-(--text) outline-none placeholder:text-(--muted) focus:border-(--accent)"
+          disabled={isSubmitting}
+          id="username"
+          maxLength={32}
+          onChange={(event) => {
+            setUsername(event.target.value);
+            setError(null);
+          }}
+          placeholder="tanuj"
+          value={username}
+        />
+
+        {error ? (
+          <p className="mt-2 text-xs leading-5 text-red-500">{error.message}</p>
+        ) : null}
+
+        <div className="mt-4 flex justify-end">
+          <button
+            className="h-9 rounded-md bg-(--accent) px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55"
+            disabled={!canSubmit}
+            type="submit"
+          >
+            {isSubmitting
+              ? isClaimMode
+                ? "Continuing"
+                : "Signing in"
+              : isClaimMode
+                ? "Continue"
+                : "Sign In"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

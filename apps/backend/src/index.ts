@@ -10,11 +10,6 @@ async function bootstrap() {
     exporterUrl: env.OTEL_EXPORTER_OTLP_ENDPOINT,
   });
 
-  console.log(
-    "env.OTEL_EXPORTER_OTLP_ENDPOINT",
-    env.OTEL_EXPORTER_OTLP_ENDPOINT,
-  );
-
   const { default: app } = await import("./server");
 
   app

@@ -61,3 +61,11 @@ export const getSessionToken = async () => {
 export const bootstrapSession = async () => {
   await getSessionToken();
 };
+
+export const hasStoredSessionToken = () => {
+  return readStoredToken() !== null;
+};
+
+export const replaceSessionToken = (token: string) => {
+  storeToken(token);
+};

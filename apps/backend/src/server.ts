@@ -10,13 +10,23 @@ import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
 import { createSessionRoutes } from "./routes/session-routes";
+import { createUserRoutes } from "./routes/user-routes";
 import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
 import { K8Service } from "./services/k8sService";
 import { addHttpMetrics } from "./middlewares/http-metrics";
 
 const redisClient = await setupComms();
-const k8Service = new K8Service();
+let k8Service: K8Service;
+try {
+  k8Service = new K8Service();
+} catch (error) {
+  console.error(
+    "Failed to initialize Kubernetes client. Check that minikube is running and kubectl has an active context.",
+  );
+  throw error;
+}
+
 const conversationService = new ConversationService({
   redis: redisClient,
   k8Service,
@@ -59,8 +69,10 @@ app.get("/health", (_req: Request, res: Response) => {
 // });
 
 const { sessionRouter } = createSessionRoutes();
+const { userRouter } = createUserRoutes();
 const { convoRouter } = createRoutes(controllers);
 app.use(sessionRouter);
+app.use(userRouter);
 app.use(convoRouter);
 
 // app.post(

@@ -8,12 +8,11 @@ import {
 } from "@repo/db/schema";
 import { InternalServerError, NotFoundError } from "../utils/custom-errors";
 
-export const getConversation = async (id: string) => {
+export const getConversation = async (id: string, userId: string) => {
   try {
     return await db.query.conversations.findFirst({
-      where(fields, { eq }) {
-        return eq(fields.id, id);
-      },
+      where: ({ id: conversationId, userId: conversationUserId }) =>
+        and(eq(conversationId, id), eq(conversationUserId, userId)),
       with: {
         messageHistory: {
           columns: {
