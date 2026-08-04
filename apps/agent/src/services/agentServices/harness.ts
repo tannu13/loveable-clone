@@ -13,7 +13,7 @@ import type {
   Part,
 } from "@google/genai";
 import env from "../../env";
-import type { ResponseHandler } from "../responseHandler";
+import type { ResponseLifeCycle } from "../responseHandler";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
@@ -27,19 +27,23 @@ export class Harness {
   private contextManager: ContextManager;
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
-  private responseHandler: ResponseHandler;
+  private responseHandler: ResponseLifeCycle;
   private currentPromptTokens = 0;
 
   status = "pending";
 
-  constructor(responseHandler: ResponseHandler, pastHistory: Content[]) {
+  constructor(
+    toolRegistry: ToolRegistry,
+    responseHandler: ResponseLifeCycle,
+    pastHistory: Content[],
+  ) {
     this.responseHandler = responseHandler;
     this.agent = new Agent(env.GEMINI_API_KEY);
     if (pastHistory.length > 0) {
       this.agent.setHistory(pastHistory);
     }
 
-    this.toolRegistry = new ToolRegistry();
+    this.toolRegistry = toolRegistry;
     this.contextManager = new ContextManager();
 
     this.hooksRegistry = new HooksRegistry();
@@ -248,11 +252,12 @@ export class Harness {
         console.dir(this.agent.getHistory(), { depth: 10 });
         processing = false;
 
-        this.responseHandler.end();
-        this.responseHandler.backupHistory(this.agent.getHistory());
-        this.responseHandler.saveToDB({
-          type: "text",
-          content: accumulatedText,
+        this.responseHandler.end({
+          history: this.agent.getHistory(),
+          db: {
+            type: "text",
+            content: accumulatedText,
+          },
         });
       }
     }
