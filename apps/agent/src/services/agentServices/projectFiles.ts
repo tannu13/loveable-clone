@@ -1,9 +1,6 @@
 import type { ProjectFile } from "@repo/shared";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import env from "../../env";
-
-const projectRoot = path.resolve(env.WORKSPACE_DIR);
 
 const editableExtensions = new Set([
   ".css",
@@ -16,11 +13,13 @@ const editableExtensions = new Set([
 ]);
 const ignoredDirectories = new Set(["node_modules", "dist", ".vite"]);
 
-export async function listProjectFiles(): Promise<ProjectFile[]> {
+export async function listProjectFiles(
+  projectRoot: string,
+): Promise<ProjectFile[]> {
   const paths = await walkProject(projectRoot);
   const files = await Promise.all(
     paths.map(async (filePath) => ({
-      path: toProjectPath(filePath),
+      path: toProjectPath(projectRoot, filePath),
       content: await readFile(filePath, "utf8"),
     })),
   );
@@ -50,11 +49,11 @@ async function walkProject(directory: string): Promise<string[]> {
   return files;
 }
 
-function toProjectPath(filePath: string) {
+function toProjectPath(projectRoot: string, filePath: string) {
   return path.relative(projectRoot, filePath).split(path.sep).join("/");
 }
 
-function resolveProjectPath(filePath: string) {
+function resolveProjectPath(projectRoot: string, filePath: string) {
   const resolvedPath = path.isAbsolute(filePath)
     ? path.resolve(filePath)
     : path.resolve(projectRoot, filePath);
@@ -71,13 +70,20 @@ function resolveProjectPath(filePath: string) {
   return resolvedPath;
 }
 
-export async function readProjectFile(filePath: string): Promise<string> {
-  return await readFile(resolveProjectPath(filePath), "utf8");
+export async function readProjectFile(
+  projectRoot: string,
+  filePath: string,
+): Promise<string> {
+  return await readFile(resolveProjectPath(projectRoot, filePath), "utf8");
 }
 
-export async function writeProjectFile(filePath: string, content: string) {
+export async function writeProjectFile(
+  projectRoot: string,
+  filePath: string,
+  content: string,
+) {
   if (!content) return;
-  const resolvedPath = resolveProjectPath(filePath);
+  const resolvedPath = resolveProjectPath(projectRoot, filePath);
   await mkdir(path.dirname(resolvedPath), { recursive: true });
   await writeFile(resolvedPath, content, "utf8");
 }

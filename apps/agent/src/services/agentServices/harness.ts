@@ -28,22 +28,32 @@ export class Harness {
   private maxIterations = 15;
   private hooksRegistry: HooksRegistry;
   private responseHandler: ResponseLifeCycle;
+  private workspace: string;
   private currentPromptTokens = 0;
 
   status = "pending";
 
-  constructor(
-    toolRegistry: ToolRegistry,
-    responseHandler: ResponseLifeCycle,
-    pastHistory: Content[],
-  ) {
+  constructor({
+    systemPrompt,
+    toolRegistry,
+    responseHandler,
+    pastHistory,
+    workspace,
+  }: {
+    systemPrompt: string;
+    toolRegistry: ToolRegistry;
+    responseHandler: ResponseLifeCycle;
+    pastHistory: Content[];
+    workspace: string;
+  }) {
     this.responseHandler = responseHandler;
-    this.agent = new Agent(env.GEMINI_API_KEY);
+    this.agent = new Agent(env.GEMINI_API_KEY, systemPrompt);
     if (pastHistory.length > 0) {
       this.agent.setHistory(pastHistory);
     }
 
     this.toolRegistry = toolRegistry;
+    this.workspace = workspace;
     this.contextManager = new ContextManager();
 
     this.hooksRegistry = new HooksRegistry();
@@ -229,6 +239,7 @@ export class Harness {
 
             const result = await tool.execute(
               parseResult.data as any,
+              this.workspace,
               this.responseHandler,
             );
             toolResponseParts.push({

@@ -7,9 +7,10 @@ import {
   writeProjectFile,
 } from "./projectFiles";
 import { QnASchema } from "@repo/shared";
-import type { ResponseHandler } from "../responseHandler";
+import type { ResponseLifeCycle } from "../responseHandler";
 import { startBuildingApp } from "./startBuildingApp";
 import { fetchRunnerLogsAfterDelay } from "./runnerLogs";
+import { SubAgentOrchestrator } from "../subAgentOrchestrator";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -18,7 +19,8 @@ interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   summaryText: (args: z.infer<S>) => string;
   execute: (
     args: z.infer<S>,
-    responseHandler: ResponseHandler,
+    workspace: string,
+    responseHandler: ResponseLifeCycle,
   ) => Promise<Record<string, unknown>>;
 }
 
@@ -31,7 +33,7 @@ export const listFileTool: AgentTool<typeof ListFileSchema> = {
   declaration: {
     name: "listFile",
     description:
-      "This tool will read and give you a list of files and their content in the project which are to be changed",
+      "This tool will read and give you a list of files along with the content of each file in the project which are to be changed",
     parametersJsonSchema: {
       type: "object",
       required: [],
@@ -39,10 +41,10 @@ export const listFileTool: AgentTool<typeof ListFileSchema> = {
   },
   schema: ListFileSchema,
   summaryText: () => `Listing files available to the project`,
-  execute: async (args) => {
+  execute: async (args, workspace) => {
     console.log("Listing files args", args);
 
-    const list = await listProjectFiles();
+    const list = await listProjectFiles(workspace);
     return { list };
   },
 };
@@ -69,8 +71,8 @@ export const readFileTool: AgentTool<typeof ReadFileSchema> = {
   },
   schema: ReadFileSchema,
   summaryText: (args) => `Reading file @ ${args.path}`,
-  execute: async (args) => {
-    const content = await readProjectFile(args.path);
+  execute: async (args, workspace) => {
+    const content = await readProjectFile(workspace, args.path);
     return {
       file: args.path,
       content,
@@ -104,8 +106,8 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
   },
   schema: WriteFileSchema,
   summaryText: (args) => `Writing to file @ ${args.path}`,
-  execute: async (args) => {
-    await writeProjectFile(args.path, args.content);
+  execute: async (args, workspace) => {
+    await writeProjectFile(workspace, args.path, args.content);
     const runnerLogs = await fetchRunnerLogsAfterDelay({
       delayMs: RUNNER_LOG_DELAY_MS,
       limit: RUNNER_LOG_LIMIT_AFTER_WRITE,
@@ -147,6 +149,71 @@ export const startBuildingAppTool: AgentTool<typeof StartBuildingAppSchema> = {
   summaryText: (args) => `Setting up the ${args.library} starter...`,
   execute: async (args) => startBuildingApp(args.library),
 };
+
+const DelegateSubAgentsSchema = z.object({
+  subAgents: z.array(
+    z.object({
+      agentId: z.string().min(1),
+      systemPrompt: z.string().min(1),
+      taskDescription: z.string().min(1),
+    }),
+  ),
+});
+export const delegateSubAgentsTool: AgentTool<typeof DelegateSubAgentsSchema> =
+  {
+    name: "delegateSubAgents",
+    declaration: {
+      name: "delegate_sub_agents",
+      description:
+        "Delegates independent tasks to multiple sub-agents in parallel. Each sub-agent runs in an isolated Git worktree, generates a diff patch artifact upon completing its task, and returns the path to the patch artifact via a callback tool.",
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          subAgents: {
+            type: Type.ARRAY,
+            description:
+              "List of independent sub-agent tasks to run concurrently.",
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                agentId: {
+                  type: Type.STRING,
+                  description:
+                    "A unique slug/identifier for the sub-agent (e.g., 'auth-refactor', 'add-tests').",
+                },
+                systemPrompt: {
+                  type: Type.STRING,
+                  description:
+                    "The system instructions and context specific to this sub-agent's task.",
+                },
+                taskDescription: {
+                  type: Type.STRING,
+                  description:
+                    "Detailed instructions on what code changes or files to modify.",
+                },
+              },
+              required: ["agentId", "systemPrompt", "taskDescription"],
+            },
+          },
+        },
+        required: ["subAgents"],
+      },
+    },
+    schema: DelegateSubAgentsSchema,
+    summaryText: (args) => `Spawning ${args.subAgents.length} sub agents...`,
+    execute: async (args) => {
+      const parentAgentId = crypto.randomUUID();
+      const orchestrator = new SubAgentOrchestrator(parentAgentId);
+
+      args.subAgents.forEach(({ systemPrompt, taskDescription }) => {
+        const agentId = crypto.randomUUID();
+        orchestrator.addAgent({ agentId, systemPrompt, taskDescription });
+      });
+
+      orchestrator.spawnAgents();
+      return {};
+    },
+  };
 
 export const qnaTool: AgentTool<typeof QnASchema> = {
   name: "qnaTool",
@@ -199,7 +266,7 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
   summaryText(_args) {
     return `Need more info, asking question(s) to user`;
   },
-  execute: async (args, responseHandler) => {
+  execute: async (args, _workspace, responseHandler) => {
     const correlationId = crypto.randomUUID();
     responseHandler.send("qna", {
       correlationId,
@@ -282,7 +349,7 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
   summaryText(_args) {
     return `Finalizing plan...`;
   },
-  execute: async (args, responseHandler) => {
+  execute: async (args, _workspace, responseHandler) => {
     responseHandler.send("plan", {
       explanation: args.explanation,
       plan: args.plan,
@@ -300,15 +367,6 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
 
 export class ToolRegistry {
   private tools = new Map<string, AgentTool>();
-
-  constructor() {
-    this.register(readFileTool)
-      .register(writeFileTool)
-      .register(startBuildingAppTool)
-      .register(qnaTool)
-      .register(updatePlanTool)
-      .register(listFileTool);
-  }
 
   register(tool: AgentTool) {
     this.tools.set(tool.name, tool);

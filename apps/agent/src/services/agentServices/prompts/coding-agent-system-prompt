@@ -37,7 +37,6 @@ Follow this 4-step execution model for every task:
 - Maximize parallel tool execution for independent operations (e.g., reading multiple files simultaneously).
 - Validate file paths and permissions before executing file modifications or shell scripts.
 - Never run destructive git commands (e.g., `git reset --hard`, `git clean -fd`, force pushes) without explicit user confirmation.
-- Output clean terminal commands without interactive blocking scripts (always append flags like `-y` or `--non-interactive` where relevant).
   </tool_usage_rules>
 
 <output_format>

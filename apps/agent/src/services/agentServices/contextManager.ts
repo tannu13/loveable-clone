@@ -38,7 +38,11 @@ export class ContextManager {
       "utf-8",
     );
 
-    const agent = new Agent(env.GEMINI_API_KEY);
+    const systemPrompt = await readFile(
+      `${currentDirectory}/prompts/coding-agent-system-prompt`,
+      "utf-8",
+    );
+    const agent = new Agent(env.GEMINI_API_KEY, systemPrompt);
     agent.addUserRole([{ text: "Summarize the below history" }]);
     oldHistoryChunk.push({
       role: "user",

@@ -10,9 +10,11 @@ export class Agent {
   private ai: GoogleGenAI;
   private history: Content[] = [];
   private model = "gemma-4-26b-a4b-it";
+  private systemPrompt = "";
   // private model = "gemini-3.5-flash-lite";
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, systemPrompt: string) {
+    this.systemPrompt = systemPrompt;
     this.ai = new GoogleGenAI({ apiKey });
   }
 
@@ -44,6 +46,7 @@ export class Agent {
       model: this.model,
       contents,
       config: {
+        systemInstruction: this.systemPrompt,
         toolConfig: {
           functionCallingConfig: {
             mode: FunctionCallingConfigMode.AUTO,
