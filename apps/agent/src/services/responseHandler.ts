@@ -2,10 +2,14 @@ import type { Message } from "@repo/shared";
 import type { RedisClientType } from "redis";
 import env from "../env";
 import type { Content } from "@google/genai";
-import { getCurrentFormattedDate } from "../utils";
+import { getCurrentFormattedDate } from "../utils/helpers";
 import type { TUploadToS3 } from "./s3Service";
 import db from "@repo/db";
 import { messageHistory } from "@repo/db/schema";
+import {
+  cleanupWorktree,
+  createDiffArtifact,
+} from "../utils/git-worktree-utils";
 
 type TDB = {
   type: Message["type"];
@@ -14,9 +18,9 @@ type TDB = {
   role?: Message["role"];
 };
 export interface ResponseLifeCycle {
-  send(type: Message["type"], payload: unknown): void;
-  end(data: { history: Content[]; db?: TDB }): void;
-  saveToDB(data: TDB): void;
+  send(type: Message["type"], payload: unknown): Promise<void>;
+  end(data: { history: Content[]; db?: TDB }): Promise<void>;
+  saveToDB(data: TDB): Promise<void>;
 }
 
 export class UserResponseHandler implements ResponseLifeCycle {
@@ -28,14 +32,14 @@ export class UserResponseHandler implements ResponseLifeCycle {
     this.uploadToS3 = uploadToS3;
   }
 
-  send(type: Message["type"], payload: unknown) {
+  async send(type: Message["type"], payload: unknown) {
     this.publisher.publish(
       `convo-response`,
       JSON.stringify({ conversationId: env.CONVERSATION_ID, type, payload }),
     );
   }
 
-  end(data: { history: Content[]; db?: TDB }) {
+  async end(data: { history: Content[]; db?: TDB }) {
     this.publisher.publish(
       `convo-response`,
       JSON.stringify({
@@ -86,23 +90,45 @@ export class UserResponseHandler implements ResponseLifeCycle {
   }
 }
 
-export class AgentResponseHandler implements ResponseLifeCycle {
-  private workspaceDir: string;
+export class SubAgentResponseHandler implements ResponseLifeCycle {
   private artifactPath: string;
+  private worktreePath: string;
+  private mainRepoPath: string;
+  private branchName: string;
 
-  constructor(workspaceDir: string, artifactPath: string) {
-    this.workspaceDir = workspaceDir;
+  constructor(
+    artifactPath: string,
+    worktreePath: string,
+    mainRepoPath: string,
+    branchName: string,
+  ) {
     this.artifactPath = artifactPath;
+    this.worktreePath = worktreePath;
+    this.mainRepoPath = mainRepoPath;
+    this.branchName = branchName;
   }
-  saveToDB(data: TDB): void {
+  async saveToDB(data: TDB) {
     // tbd
     return;
   }
-  send(type: Message["type"], payload: unknown) {
+  async send(type: Message["type"], payload: unknown) {
     // tbd
   }
 
-  end() {
-    // at the this.workspaceDir create a git worktree
+  async end() {
+    // write the diff in the worktree to the artifact file path
+    try {
+      createDiffArtifact(this.worktreePath, this.artifactPath);
+    } finally {
+      // clean up the worktree
+      cleanupWorktree(this.mainRepoPath, this.branchName);
+    }
+    // send the message with the artifact path
+    if (!process.send) return;
+
+    process.send({
+      type: "finished",
+      artifactPath: this.artifactPath,
+    });
   }
 }

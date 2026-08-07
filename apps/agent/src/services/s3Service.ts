@@ -8,6 +8,7 @@ import {
 import { Readable } from "stream";
 import * as unzipper from "unzipper";
 import env from "../env";
+import { getMainRepoPath } from "../utils/helpers";
 
 const isDev = env.NODE_ENV === "development";
 const BACKUP_FILE_NAME = `chat-backup-${env.CONVERSATION_ID}-latest.json`;
@@ -108,7 +109,7 @@ class S3Service {
       Key: templateName,
     };
 
-    const outputDirectory = env.WORKSPACE_DIR;
+    const outputDirectory = getMainRepoPath();
 
     try {
       await this.client.send(new HeadObjectCommand(params));
