@@ -11,6 +11,7 @@ import type { ResponseLifeCycle } from "../responseHandler";
 import { startBuildingApp } from "./startBuildingApp";
 import { fetchRunnerLogsAfterDelay } from "./runnerLogs";
 import { SubAgentOrchestrator } from "../subAgentOrchestrator";
+import path from "node:path";
 
 interface AgentTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
@@ -117,7 +118,7 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
     return {
       file: args.path,
       write: true,
-      runnerLogs,
+      // runnerLogs,
     };
   },
 };
@@ -153,8 +154,6 @@ export const startBuildingAppTool: AgentTool<typeof StartBuildingAppSchema> = {
 const DelegateSubAgentsSchema = z.object({
   subAgents: z.array(
     z.object({
-      agentId: z.string().min(1),
-      systemPrompt: z.string().min(1),
       taskDescription: z.string().min(1),
     }),
   ),
@@ -163,9 +162,9 @@ export const delegateSubAgentsTool: AgentTool<typeof DelegateSubAgentsSchema> =
   {
     name: "delegateSubAgents",
     declaration: {
-      name: "delegate_sub_agents",
+      name: "delegateSubAgents",
       description:
-        "Delegates independent tasks to multiple sub-agents in parallel. Each sub-agent runs in an isolated Git worktree, generates a diff patch artifact upon completing its task, and returns the path to the patch artifact via a callback tool.",
+        "Delegates independent tasks to multiple sub-agents in parallel. Each sub-agent runs in an isolated Git worktree, generates a diff patch artifact upon completing its task, and returns the content to the patch artifact via a callback tool.",
       parameters: {
         type: Type.OBJECT,
         properties: {
@@ -176,23 +175,13 @@ export const delegateSubAgentsTool: AgentTool<typeof DelegateSubAgentsSchema> =
             items: {
               type: Type.OBJECT,
               properties: {
-                agentId: {
-                  type: Type.STRING,
-                  description:
-                    "A unique slug/identifier for the sub-agent (e.g., 'auth-refactor', 'add-tests').",
-                },
-                systemPrompt: {
-                  type: Type.STRING,
-                  description:
-                    "The system instructions and context specific to this sub-agent's task.",
-                },
                 taskDescription: {
                   type: Type.STRING,
                   description:
                     "Detailed instructions on what code changes or files to modify.",
                 },
               },
-              required: ["agentId", "systemPrompt", "taskDescription"],
+              required: ["taskDescription"],
             },
           },
         },
@@ -205,13 +194,31 @@ export const delegateSubAgentsTool: AgentTool<typeof DelegateSubAgentsSchema> =
       const parentAgentId = crypto.randomUUID();
       const orchestrator = new SubAgentOrchestrator(parentAgentId);
 
-      args.subAgents.forEach(({ systemPrompt, taskDescription }) => {
+      const subAgentSystemPromptPath = path.resolve(
+        import.meta.dirname,
+        "./prompts/coding-agent-system-prompt",
+      );
+      let systemPrompt = "";
+      try {
+        systemPrompt = await Bun.file(subAgentSystemPromptPath).text();
+      } catch {
+        systemPrompt = "You are a coding assistant";
+      }
+
+      args.subAgents.forEach(({ taskDescription }) => {
         const agentId = crypto.randomUUID();
         orchestrator.addAgent({ agentId, systemPrompt, taskDescription });
       });
 
-      orchestrator.spawnAgents();
-      return {};
+      try {
+        const subAgentResponse = await orchestrator.spawnAgents();
+        return { subAgentResponse };
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          return { error: err.message };
+        }
+        return { error: err };
+      }
     },
   };
 

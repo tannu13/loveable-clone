@@ -6,3 +6,12 @@ export type SendResponse = (
   payload: Message["content"],
 ) => void;
 export type EndResponse = (history: Content[]) => Promise<void>;
+
+export type TAgentStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
+export type TSubAgentResponse = {
+  agentId: string;
+  status: TAgentStatus;
+  artifactContent: string;
+  taskDescription: string;
+  logs: string;
+};

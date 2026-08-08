@@ -9,9 +9,9 @@ import type { ToolRegistry } from "./tools";
 export class Agent {
   private ai: GoogleGenAI;
   private history: Content[] = [];
-  private model = "gemma-4-26b-a4b-it";
+  // private model = "gemma-4-26b-a4b-it";
   private systemPrompt = "";
-  // private model = "gemini-3.5-flash-lite";
+  private model = "gemini-3.5-flash-lite";
 
   constructor(apiKey: string, systemPrompt: string) {
     this.systemPrompt = systemPrompt;

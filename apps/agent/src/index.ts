@@ -5,6 +5,7 @@ import { s3Service } from "./services/s3Service";
 import type { Content } from "@google/genai";
 import { UserResponseHandler } from "./services/responseHandler";
 import {
+  delegateSubAgentsTool,
   listFileTool,
   qnaTool,
   readFileTool,
@@ -24,12 +25,12 @@ const responseHandler = new UserResponseHandler(
 );
 
 let pastHistory: Content[] = [];
-const historyFromBackup = (await s3Service.loadBackupFromS3()) as {
-  history: Content[];
-} | null;
-if (historyFromBackup) {
-  pastHistory = historyFromBackup.history;
-}
+// const historyFromBackup = (await s3Service.loadBackupFromS3()) as {
+//   history: Content[];
+// } | null;
+// if (historyFromBackup) {
+//   pastHistory = historyFromBackup.history;
+// }
 
 const toolRegistry = new ToolRegistry();
 toolRegistry
@@ -38,7 +39,8 @@ toolRegistry
   .register(startBuildingAppTool)
   .register(qnaTool)
   .register(updatePlanTool)
-  .register(listFileTool);
+  .register(listFileTool)
+  .register(delegateSubAgentsTool);
 
 const systemPromptFilePath = path.resolve(
   import.meta.dirname,

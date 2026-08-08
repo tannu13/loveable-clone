@@ -118,10 +118,10 @@ export class SubAgentResponseHandler implements ResponseLifeCycle {
   async end() {
     // write the diff in the worktree to the artifact file path
     try {
-      createDiffArtifact(this.worktreePath, this.artifactPath);
+      await createDiffArtifact(this.worktreePath, this.artifactPath);
     } finally {
       // clean up the worktree
-      cleanupWorktree(this.mainRepoPath, this.branchName);
+      await cleanupWorktree(this.mainRepoPath, this.branchName);
     }
     // send the message with the artifact path
     if (!process.send) return;
