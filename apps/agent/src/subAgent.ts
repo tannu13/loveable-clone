@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { Harness } from "./services/agentServices/harness";
 import {
+  gitCommitTool,
   listFileTool,
   readFileTool,
   ToolRegistry,
@@ -25,7 +26,8 @@ const toolRegistry = new ToolRegistry();
 toolRegistry
   .register(readFileTool)
   .register(writeFileTool)
-  .register(listFileTool);
+  .register(listFileTool)
+  .register(gitCommitTool);
 
 const agentId = process.argv[2];
 const systemPrompt = process.argv[3];

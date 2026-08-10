@@ -1,4 +1,5 @@
 import type { ProjectFile } from "@repo/shared";
+import { $ } from "bun";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -20,7 +21,6 @@ export async function listProjectFiles(
   const files = await Promise.all(
     paths.map(async (filePath) => ({
       path: toProjectPath(projectRoot, filePath),
-      content: await readFile(filePath, "utf8"),
     })),
   );
 
@@ -86,4 +86,11 @@ export async function writeProjectFile(
   const resolvedPath = resolveProjectPath(projectRoot, filePath);
   await mkdir(path.dirname(resolvedPath), { recursive: true });
   await writeFile(resolvedPath, content, "utf8");
+}
+
+export async function commitWorkspace(
+  projectRoot: string,
+  commitMessage: string,
+) {
+  await $`cd ${projectRoot} && git add . && git commit -m ${commitMessage}`;
 }

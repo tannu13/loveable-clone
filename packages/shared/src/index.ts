@@ -2,7 +2,6 @@ import z from "zod";
 
 export type ProjectFile = {
   path: string;
-  content: string;
 };
 
 // type MessageType = "text" | "qna" | "plan";
@@ -50,3 +49,5 @@ export const QnAReplySchema = z.object({
   correlationId: z.string().min(1),
 });
 export type TQnAReplySchema = z.infer<typeof QnAReplySchema>;
+
+export { getMainRepoPath } from "./helpers";

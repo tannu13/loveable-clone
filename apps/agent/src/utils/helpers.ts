@@ -1,5 +1,6 @@
 import { access } from "node:fs/promises";
 import env from "../env";
+import { getMainRepoPath as getMainRepoPathShared } from "@repo/shared";
 
 export async function checkFileExists(filePath: string) {
   try {
@@ -11,7 +12,7 @@ export async function checkFileExists(filePath: string) {
 }
 
 export function getMainRepoPath() {
-  return `${env.WORKSPACE_DIR}/main-repo`;
+  return getMainRepoPathShared(env.WORKSPACE_DIR);
 }
 
 export const getCurrentFormattedDate = () => {

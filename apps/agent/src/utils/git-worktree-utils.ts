@@ -1,4 +1,5 @@
 import { execFile as execFileCb } from "node:child_process";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -63,7 +64,7 @@ export async function createDiffArtifact(
   const absoluteArtifactPath = path.resolve(artifactPath);
 
   await runGit(
-    ["diff", baseBranch, "--output", absoluteArtifactPath],
+    ["diff", `${baseBranch}..HEAD`, "--output", absoluteArtifactPath],
     absoluteWorktreePath,
   );
 
@@ -78,13 +79,13 @@ export async function cleanupWorktree(
   const worktreePath = getWorktreePath(mainRepoFolder, branchName);
   try {
     await runGit(["worktree", "remove", "--force", worktreePath], absolutePath);
-    await runGit(["branch", "-d", branchName], absolutePath);
+    await runGit(["branch", "-D", branchName], absolutePath);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(
       `[WARN] Git worktree removal failed, falling back to FS removal: ${msg}`,
     );
-    await Bun.file(worktreePath).delete();
+    // await rm(worktreePath, { recursive: true, force: true });
   }
 
   try {

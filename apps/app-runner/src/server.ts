@@ -9,6 +9,7 @@ import {
 } from "./types/validations";
 import { currentOperation } from "./services/currentOperation";
 import { logs } from "./services/logBuffer";
+import { getMainRepoPath } from "@repo/shared";
 
 const app = express();
 app.use(express.json());
@@ -41,7 +42,7 @@ app.post("/start", (_req: Request, res: Response) => {
       String(env.DEV_PORT),
     ],
     {
-      cwd: env.APP_DIR,
+      cwd: getMainRepoPath(env.APP_DIR),
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
@@ -67,7 +68,7 @@ app.post("/start", (_req: Request, res: Response) => {
 
   return res.status(200).json({
     status: "started",
-    appDir: env.APP_DIR,
+    appDir: getMainRepoPath(env.APP_DIR),
     host: env.DEV_HOST,
     port: env.DEV_PORT,
   });
@@ -113,7 +114,7 @@ app.post("/restart", async (_req: Request, res: Response) => {
       String(env.DEV_PORT),
     ],
     {
-      cwd: env.APP_DIR,
+      cwd: getMainRepoPath(env.APP_DIR),
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
@@ -139,7 +140,7 @@ app.post("/restart", async (_req: Request, res: Response) => {
 
   return res.status(200).json({
     status: "restarted",
-    appDir: env.APP_DIR,
+    appDir: getMainRepoPath(env.APP_DIR),
     host: env.DEV_HOST,
     port: env.DEV_PORT,
   });
@@ -153,7 +154,7 @@ app.post("/install", async (_req: Request, res: Response) => {
 
   return res.status(statusCode).json({
     ...result,
-    appDir: env.APP_DIR,
+    appDir: getMainRepoPath(env.APP_DIR),
   });
 });
 
@@ -171,7 +172,7 @@ app.post(
     return res.status(statusCode).json({
       ...result,
       packages: packages,
-      appDir: env.APP_DIR,
+      appDir: getMainRepoPath(env.APP_DIR),
     });
   },
 );
@@ -190,14 +191,14 @@ app.post(
     return res.status(statusCode).json({
       ...result,
       packages: packages,
-      appDir: env.APP_DIR,
+      appDir: getMainRepoPath(env.APP_DIR),
     });
   },
 );
 
 app.get("/status", (_req: Request, res: Response) => {
   return res.status(200).json({
-    appDir: env.APP_DIR,
+    appDir: getMainRepoPath(env.APP_DIR),
     devServer: {
       running: devServerProcess !== null,
       lastExitCode: lastDevExitCode,

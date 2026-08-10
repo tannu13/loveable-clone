@@ -2,6 +2,7 @@ import { Type, type FunctionDeclaration } from "@google/genai";
 import z from "zod";
 import { waitForResponse } from "../comms";
 import {
+  commitWorkspace,
   listProjectFiles,
   readProjectFile,
   writeProjectFile,
@@ -118,7 +119,7 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema> = {
     return {
       file: args.path,
       write: true,
-      // runnerLogs,
+      runnerLogs,
     };
   },
 };
@@ -164,7 +165,7 @@ export const delegateSubAgentsTool: AgentTool<typeof DelegateSubAgentsSchema> =
     declaration: {
       name: "delegateSubAgents",
       description:
-        "Delegates independent tasks to multiple sub-agents in parallel. Each sub-agent runs in an isolated Git worktree, generates a diff patch artifact upon completing its task, and returns the content to the patch artifact via a callback tool.",
+        "Delegates independent tasks to multiple sub-agents in parallel. For each subagent, create the task description and non-conflicting expected file ownership so that each agent can work on files in a non-conflicting way. Each sub-agent runs in an isolated Git worktree, generates a diff patch artifact upon completing its task, and returns the content to the patch artifact via a callback tool. The diff responses of this tool call then needs to be applied to the codebase via writing to the files",
       parameters: {
         type: Type.OBJECT,
         properties: {
@@ -221,6 +222,47 @@ export const delegateSubAgentsTool: AgentTool<typeof DelegateSubAgentsSchema> =
       }
     },
   };
+
+const GitCommitSchema = z.object({
+  commitMessage: z.string().min(1, "Commit message cannot be empty"),
+});
+export const gitCommitTool: AgentTool<typeof GitCommitSchema> = {
+  name: "gitCommit",
+  declaration: {
+    name: "gitCommit",
+    description: `Executes a git commit on the workspace to commit the current set of completed changes.
+      WHEN TO USE:
+      - Call this only near the end of the current task, after all file edits and write operations are complete.
+      - Requires that at least one write tool call has been executed during the current task.
+      - Call it only when you do not expect to make any further file edits or write tool calls for the current task.
+
+      DO NOT USE:
+      - Do not call after every individual write tool call.
+      - Do not call if additional file edits or write tool calls are still expected for the current task.`,
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        commitMessage: {
+          type: "string",
+          description:
+            "Give a short, imperative subject line (under 50 characters) and use the message body to explain why the change was made rather than how.",
+        },
+      },
+      required: ["commitMessage"],
+    },
+  },
+  schema: GitCommitSchema,
+  summaryText: () => `Saving the current changes to repo...`,
+  execute: async (args, workspace) => {
+    try {
+      await commitWorkspace(workspace, args.commitMessage);
+      return { status: "Workspace state committed" };
+    } catch (err: unknown) {
+      let errorMessage = err instanceof Error ? err.message : String(err);
+      return { status: errorMessage };
+    }
+  },
+};
 
 export const qnaTool: AgentTool<typeof QnASchema> = {
   name: "qnaTool",

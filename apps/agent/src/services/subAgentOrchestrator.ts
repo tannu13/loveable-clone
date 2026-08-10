@@ -49,13 +49,6 @@ export class SubAgentOrchestrator {
         taskDescription: agent.taskDescription,
         logs: agent.logs,
       });
-      console.log({
-        agentId,
-        status: agent.status,
-        artifactContent,
-        taskDescription: agent.taskDescription,
-        logs: agent.logs,
-      });
     }
 
     this.resolver(response);

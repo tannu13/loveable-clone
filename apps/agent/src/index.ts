@@ -6,6 +6,7 @@ import type { Content } from "@google/genai";
 import { UserResponseHandler } from "./services/responseHandler";
 import {
   delegateSubAgentsTool,
+  gitCommitTool,
   listFileTool,
   qnaTool,
   readFileTool,
@@ -40,6 +41,7 @@ toolRegistry
   .register(qnaTool)
   .register(updatePlanTool)
   .register(listFileTool)
+  .register(gitCommitTool)
   .register(delegateSubAgentsTool);
 
 const systemPromptFilePath = path.resolve(
