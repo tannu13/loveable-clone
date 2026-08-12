@@ -7,6 +7,7 @@ import type { RedisClientType } from "redis";
 import type { K8Service } from "./k8sService";
 import type { TRedisMessageSchema } from "@repo/shared";
 import { setSpanAttributes, withActiveSpan } from "@repo/observability";
+import { logger } from "../logger";
 
 export class ConversationService {
   private publisher: RedisClientType;
@@ -42,6 +43,7 @@ export class ConversationService {
     }
 
     conversationId = await withActiveSpan("message.save", async () => {
+      logger.info("Saving conversation");
       return conversationId
         ? await saveMessage(conversationId, userId, payload)
         : await saveConversation({ ...payload, userId });
@@ -52,6 +54,7 @@ export class ConversationService {
     });
 
     await withActiveSpan("redis.push", async () => {
+      logger.info("Pushing conversation message to redis");
       // create job for this and push it to agent process via redis
       const messagePayload: TRedisMessageSchema = {
         conversationId,

@@ -12,6 +12,9 @@ import {
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { initializeMetrics } from "./metrics";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { PinoInstrumentation } from "@opentelemetry/instrumentation-pino";
 
 export function initializeObservability(config: {
   serviceName: string;
@@ -27,9 +30,8 @@ export function initializeObservability(config: {
     url: `${config.exporterUrl}/v1/metrics`,
   });
 
-  const metricReader = new PeriodicExportingMetricReader({
-    exporter: metricExporter,
-    exportIntervalMillis: 15000, // Export interval every 15 secs
+  const logExporter = new OTLPLogExporter({
+    url: `${config.exporterUrl}/v1/logs`,
   });
 
   const sdk = new NodeSDK({
@@ -39,7 +41,17 @@ export function initializeObservability(config: {
       [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: config.env,
     }),
     spanProcessors: [new BatchSpanProcessor(traceExporter)],
-    metricReaders: [metricReader],
+    metricReaders: [
+      new PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: 15000, // Export interval every 15 secs
+      }),
+    ],
+    logRecordProcessors: [
+      new BatchLogRecordProcessor({
+        exporter: logExporter,
+      }),
+    ],
     instrumentations: [
       getNodeAutoInstrumentations({
         "@opentelemetry/instrumentation-fs": {
@@ -56,6 +68,7 @@ export function initializeObservability(config: {
           ignoreLayersType: [ExpressLayerType.MIDDLEWARE],
         },
       }),
+      new PinoInstrumentation(),
     ],
   });
 

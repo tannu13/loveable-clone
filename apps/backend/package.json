@@ -24,12 +24,13 @@
     "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@repo/db": "workspace:*",
-    "@repo/shared": "workspace:*",
     "@repo/observability": "workspace:*",
+    "@repo/shared": "workspace:*",
     "bullmq": "^5.79.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "pino": "^10.3.1",
     "redis": "^6.1.0",
     "zod": "^4.4.3"
   }

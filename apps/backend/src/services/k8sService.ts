@@ -7,6 +7,7 @@ import {
 } from "@kubernetes/client-node";
 import env from "../env";
 import { withActiveSpan } from "@repo/observability";
+import { logger } from "../logger";
 
 export class K8Service {
   private k8sApi: CoreV1Api;
@@ -40,6 +41,7 @@ export class K8Service {
 
   async ensureInfrastructure(conversationId: string) {
     await withActiveSpan("k8s-cluster.ensure", async () => {
+      logger.info("Provisioning / ensuring conversation cluster");
       this.ensureWorkspacePVC(conversationId);
       this.ensureConversationDeployment(conversationId);
       this.ensurePreviewService(conversationId);
@@ -74,6 +76,7 @@ export class K8Service {
     } catch (err: any) {
       if (err instanceof ApiException && err.code === 409) {
         // PVC already exists, so we can safely continue!
+        logger.error(`PVC resource for ${conversationId} already exists`);
         return;
       }
       throw err;
@@ -112,6 +115,7 @@ export class K8Service {
       });
     } catch (err: any) {
       if (err instanceof ApiException && err.code === 409) {
+        logger.error(`Service resource for ${conversationId} already exists`);
         return;
       }
       throw err;
@@ -162,6 +166,7 @@ export class K8Service {
       });
     } catch (err: any) {
       if (err instanceof ApiException && err.code === 409) {
+        logger.error(`Ingress resource for ${conversationId} already exists`);
         return;
       }
       throw err;
@@ -298,6 +303,9 @@ export class K8Service {
     } catch (err) {
       if (err instanceof ApiException && err.code === 409) {
         // Pod already exists.
+        logger.error(
+          `Deployment resource for ${conversationId} already exists`,
+        );
         return;
       }
 

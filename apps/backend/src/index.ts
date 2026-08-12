@@ -11,13 +11,14 @@ async function bootstrap() {
   });
 
   const { default: app } = await import("./server");
+  const { logger } = await import("./logger");
 
   app
     .listen(env.APP_PORT, () => {
-      console.log(`Server running on ${env.APP_PORT}`);
+      logger.info(`Server running on ${env.APP_PORT}`);
     })
     .on("error", (err) => {
-      console.error("Listen failed:", err);
+      logger.error(`Listen failed: ${err.message}`);
     });
 }
 

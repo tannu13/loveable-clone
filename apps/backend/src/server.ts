@@ -15,13 +15,15 @@ import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
 import { K8Service } from "./services/k8sService";
 import { addHttpMetrics } from "./middlewares/http-metrics";
+import { logger } from "./logger";
+import { withActiveSpan } from "@repo/observability";
 
 const redisClient = await setupComms();
 let k8Service: K8Service;
 try {
   k8Service = new K8Service();
 } catch (error) {
-  console.error(
+  logger.error(
     "Failed to initialize Kubernetes client. Check that minikube is running and kubectl has an active context.",
   );
   throw error;
@@ -67,6 +69,14 @@ app.get("/health", (_req: Request, res: Response) => {
 
 //   response.status(200).json(ps);
 // });
+
+app.get("/test-logs", (req, res) => {
+  withActiveSpan("otel-context-added-test", async () => {
+    logger.info({ test: "otel-logsddd" }, "Testing OpenTelemetry logs");
+  });
+
+  res.json({ ok: true });
+});
 
 const { sessionRouter } = createSessionRoutes();
 const { userRouter } = createUserRoutes();
@@ -133,7 +143,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
       message: err.message,
     });
   }
-  console.error(err);
+  logger.error(err);
   return res.status(500).json({
     code: "INTERNAL_SERVER_ERROR",
     message:

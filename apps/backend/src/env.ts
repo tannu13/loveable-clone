@@ -5,6 +5,9 @@ const EnvSchema = z
     APP_PORT: z.coerce.number().positive().default(3000),
     NODE_ENV: z.enum(["development", "production"]).default("development"),
     APP_STAGE: z.enum(["dev", "prod"]).default("dev"),
+    LOG_LEVEL: z
+      .enum(["info", "debug", "error", "fatal", "silent", "trace", "warn"])
+      .default("info"),
     JWT_SECRET: z.string().min(32).optional(),
     GEMINI_API_KEY: z.string().min(1),
     FRONTEND_URL: z.string().startsWith("http"),
@@ -47,6 +50,8 @@ try {
   env = EnvSchema.parse(process.env);
 } catch (error) {
   if (error instanceof z.ZodError) {
+    // not using logger here because this file gets imported before observability init and
+    // pino instrumentation is missed if pino logger is imported before instrumentation is initialised
     console.error("Invalid environment variables", error);
     console.error(JSON.stringify(z.treeifyError(error), null, 2));
 
