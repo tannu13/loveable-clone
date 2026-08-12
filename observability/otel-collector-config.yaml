@@ -17,6 +17,8 @@ exporters:
       insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
 
 service:
   pipelines:
@@ -31,4 +33,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlphttp/loki]

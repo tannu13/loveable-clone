@@ -31,3 +31,11 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3001:3000"
+
+  loki:
+    image: grafana/loki:3.7.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
