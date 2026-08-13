@@ -1,5 +1,6 @@
 import {
   assertConversationBelongsToUser,
+  getConversation,
   saveConversation,
   saveMessage,
 } from "../models/conversation-model";
@@ -22,6 +23,10 @@ export class ConversationService {
   }) {
     this.publisher = redis;
     this.k8Service = k8Service;
+  }
+
+  async getMessage(id: string, userId: string) {
+    return await getConversation(id, userId);
   }
 
   async handleMessage(

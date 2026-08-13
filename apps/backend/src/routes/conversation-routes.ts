@@ -10,6 +10,8 @@ export const createRoutes = (controllers: TControllers) => {
 
   convoRouter.use("/api/conversation", authMiddleware);
 
+  convoRouter.get("/api/conversation/:id", controllers.getConversation);
+
   convoRouter.post(
     "/api/conversation/",
     validate("body", ConversationSchema),

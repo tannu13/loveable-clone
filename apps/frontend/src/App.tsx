@@ -1,5 +1,5 @@
 import type { Message, ProjectFile, ProjectSnapshot } from "@repo/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type SubmitEventHandler,
   useCallback,
@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { QnAMessage } from "./components/QnAMessage";
 import { useConversationStream } from "./hooks/useConversationStream";
 import { isPlanComplete, PlanMessage } from "./components/PlanMessage";
@@ -21,6 +22,34 @@ import {
 import { bootstrapSession, hasStoredSessionToken } from "./lib/session";
 
 type ViewMode = "code" | "preview";
+
+type ConversationDetails = ProjectSnapshot & {
+  conversationId: string;
+};
+
+type ConversationDetailsResponse = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+  title: string | null;
+  messageHistory: Array<{
+    type: Message["type"];
+    createdAt: string;
+    role: Message["role"];
+    content: string;
+    metadata: unknown;
+  }>;
+};
+
+class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 type FileTreeRow =
   | {
@@ -45,6 +74,70 @@ async function fetchProjectSnapshot(): Promise<ProjectSnapshot> {
   }
 
   return response.json() as Promise<ProjectSnapshot>;
+}
+
+async function fetchConversationDetails(
+  conversationId: string,
+): Promise<ConversationDetails> {
+  const response = await apiFetch(
+    `/api/conversation/${encodeURIComponent(conversationId)}`,
+  );
+
+  if (!response.ok) {
+    throw new HttpError(
+      `Failed to load conversation: ${response.status}`,
+      response.status,
+    );
+  }
+
+  const payload = (await response.json()) as ConversationDetailsResponse;
+
+  return {
+    conversationId: payload.id,
+    files: [],
+    messageHistory: payload.messageHistory.map((message) => ({
+      content: message.content,
+      createdAt: new Date(message.createdAt).toISOString(),
+      role: message.role,
+      type: message.type,
+    })),
+    previewUrl: "",
+    summary: payload.title ?? "Project conversation",
+    updatedAt: new Date(payload.updatedAt).toISOString(),
+  };
+}
+
+async function fetchProjectFileContent(path: string): Promise<string> {
+  const response = await apiFetch(
+    `/api/project/file?path=${encodeURIComponent(path)}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to load file content: ${response.status}`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    return response.text();
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (typeof payload === "string") {
+    return payload;
+  }
+
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "content" in payload &&
+    typeof payload.content === "string"
+  ) {
+    return payload.content;
+  }
+
+  throw new Error("File content response did not include text content");
 }
 
 function buildFileTreeRows(files: ProjectFile[]): FileTreeRow[] {
@@ -85,6 +178,17 @@ function buildFileTreeRows(files: ProjectFile[]): FileTreeRow[] {
 }
 
 export function App() {
+  return (
+    <Routes>
+      <Route element={<WorkspaceRoute />} path="/" />
+      <Route element={<WorkspaceRoute />} path="/:conversationId" />
+    </Routes>
+  );
+}
+
+function WorkspaceRoute() {
+  const { conversationId: routeConversationId } = useParams();
+  const navigate = useNavigate();
   const [hasSession, setHasSession] = useState(() => hasStoredSessionToken());
   const [viewMode, setViewMode] = useState<ViewMode>("code");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
@@ -92,33 +196,50 @@ export function App() {
   const [identity, setIdentity] = useState<UserIdentity>(() =>
     getStoredIdentity(),
   );
+  const queryClient = useQueryClient();
 
   const projectQuery = useQuery({
     enabled: hasSession,
-    queryKey: ["project"],
-    queryFn: fetchProjectSnapshot,
+    queryKey: routeConversationId
+      ? ["conversation-details", routeConversationId]
+      : ["project"],
+    queryFn: () =>
+      routeConversationId
+        ? fetchConversationDetails(routeConversationId)
+        : fetchProjectSnapshot(),
   });
-  const conversationStream = useConversationStream();
+  const conversationStream = useConversationStream(routeConversationId);
+
+  useEffect(() => {
+    if (
+      routeConversationId &&
+      projectQuery.error instanceof HttpError &&
+      projectQuery.error.status === 404
+    ) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, projectQuery.error, routeConversationId]);
 
   const files = projectQuery.data?.files ?? [];
   const selectedFile = useMemo(
-    () => files.find((file) => file.path === selectedFilePath) ?? files[0],
+    () => files.find((file) => file.path === selectedFilePath),
     [files, selectedFilePath],
   );
 
   useEffect(() => {
-    if (files.length === 0) {
-      setSelectedFilePath(null);
-      return;
-    }
-
     if (
-      !selectedFilePath ||
+      selectedFilePath &&
       !files.some((file) => file.path === selectedFilePath)
     ) {
-      setSelectedFilePath(files[0]!.path);
+      setSelectedFilePath(null);
     }
   }, [files, selectedFilePath]);
+
+  const selectedFileContentQuery = useQuery({
+    enabled: hasSession && Boolean(selectedFile?.path),
+    queryKey: ["project-file-content", selectedFile?.path],
+    queryFn: () => fetchProjectFileContent(selectedFile!.path),
+  });
 
   const statusLabel = (() => {
     if (conversationStream.isStreaming) {
@@ -144,18 +265,36 @@ export function App() {
     [conversationStream.streamedMessages, projectQuery.data?.messageHistory],
   );
 
-  const refreshProject = useCallback(async () => {
-    await projectQuery.refetch();
-    setPreviewReloadKey((currentKey) => currentKey + 1);
-  }, [projectQuery]);
-
   const handleSendMessage = useCallback(
     (message: string) => {
       void conversationStream.sendMessage(message, {
-        onComplete: refreshProject,
+        conversationId: routeConversationId,
+        onConversationStarted: ({
+          conversationId: startedConversationId,
+          previewUrl,
+          userMessage,
+        }) => {
+          if (routeConversationId) {
+            return;
+          }
+
+          queryClient.setQueryData(
+            ["conversation-details", startedConversationId],
+            {
+              conversationId: startedConversationId,
+              files: [],
+              messageHistory: [],
+              previewUrl,
+              summary: "Project conversation",
+              updatedAt: userMessage.createdAt,
+            },
+          );
+
+          navigate(`/${startedConversationId}`);
+        },
       });
     },
-    [conversationStream, refreshProject],
+    [routeConversationId, conversationStream, navigate, queryClient],
   );
 
   const handleIdentityChange = useCallback(
@@ -225,7 +364,11 @@ export function App() {
               <CodeWorkspace
                 error={projectQuery.error}
                 files={files}
+                fileContent={selectedFileContentQuery.data}
+                fileContentError={selectedFileContentQuery.error}
                 isError={projectQuery.isError}
+                isFileContentError={selectedFileContentQuery.isError}
+                isFileContentLoading={selectedFileContentQuery.isLoading}
                 isLoading={projectQuery.isLoading}
                 onSelectFile={setSelectedFilePath}
                 selectedFile={selectedFile}
@@ -305,20 +448,28 @@ function LandingPage({ onStart }: { onStart: () => void }) {
 function CodeWorkspace({
   error,
   files,
+  fileContent,
+  fileContentError,
   isError,
+  isFileContentError,
+  isFileContentLoading,
   isLoading,
   onSelectFile,
   selectedFile,
 }: {
   error: Error | null;
   files: ProjectFile[];
+  fileContent?: string;
+  fileContentError: Error | null;
   isError: boolean;
+  isFileContentError: boolean;
+  isFileContentLoading: boolean;
   isLoading: boolean;
   onSelectFile: (path: string) => void;
   selectedFile?: ProjectFile;
 }) {
   const treeRows = useMemo(() => buildFileTreeRows(files), [files]);
-  const codeLines = selectedFile?.content.split("\n") ?? [];
+  const codeLines = fileContent?.split("\n") ?? [];
 
   return (
     <div className="grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:grid-cols-[280px_minmax(0,1fr)]">
@@ -381,7 +532,7 @@ function CodeWorkspace({
             </span>
           </div>
           <span className="text-xs text-(--muted)">
-            {selectedFile ? `${codeLines.length} lines` : "Project"}
+            {selectedFile && fileContent ? `${codeLines.length} lines` : "Project"}
           </span>
         </div>
 
@@ -395,6 +546,13 @@ function CodeWorkspace({
             />
           ) : !selectedFile ? (
             <EmptyState title="Select a file to view its code" />
+          ) : isFileContentLoading ? (
+            <EmptyState title="Loading file content" />
+          ) : isFileContentError ? (
+            <EmptyState
+              title="Unable to read file"
+              detail={fileContentError?.message}
+            />
           ) : (
             codeLines.map((line, index) => (
               <div

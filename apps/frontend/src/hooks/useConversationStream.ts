@@ -1,15 +1,35 @@
 import type { Message } from "@repo/shared";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
 
 type ConversationStreamOptions = {
-  onComplete?: () => Promise<void> | void;
+  conversationId?: string;
+  onConversationStarted?: (details: {
+    conversationId: string;
+    previewUrl: string;
+    userMessage: Message;
+  }) => Promise<void> | void;
 };
 
 type ConversationStreamState = {
   error: Error | null;
   isStreaming: boolean;
   streamedMessages: Message[];
+};
+
+type ConversationStartResponse = {
+  conversationId: string;
+  previewUrl: string;
+};
+
+type WebSocketPayload = {
+  conversationId?: string;
+  type?: Message["type"];
+  role?: Message["role"];
+  payload?: unknown;
+  message?: unknown;
+  content?: unknown;
+  createdAt?: string;
 };
 
 function createMessage(role: Message["role"], content: string): Message {
@@ -21,102 +41,127 @@ function createMessage(role: Message["role"], content: string): Message {
   };
 }
 
-function parseSseEvent(event: string): string | null {
-  const dataLines: string[] = [];
+function isConversationStartResponse(
+  payload: unknown,
+): payload is ConversationStartResponse {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "conversationId" in payload &&
+    typeof payload.conversationId === "string" &&
+    payload.conversationId.length > 0 &&
+    "previewUrl" in payload &&
+    typeof payload.previewUrl === "string"
+  );
+}
 
-  for (const line of event.split(/\r?\n/)) {
-    if (line.startsWith("data:")) {
-      const value = line.slice("data:".length);
-      dataLines.push(value.startsWith(" ") ? value.slice(1) : value);
-      continue;
-    }
+function getConversationWebSocketUrl(conversationId: string): string {
+  const configuredUrl = import.meta.env.VITE_CONVERSATION_WS_URL as
+    | string
+    | undefined;
+  const baseUrl =
+    configuredUrl ??
+    `${window.location.protocol === "https:" ? "wss" : "ws"}://${
+      window.location.hostname
+    }:3010`;
+  const url = new URL(baseUrl);
 
-    if (dataLines.length > 0) {
-      dataLines.push(line);
-    }
-  }
+  url.searchParams.set("conversation_id", conversationId);
 
-  if (dataLines.length === 0) {
+  return url.toString();
+}
+
+function parseWebSocketMessage(eventData: unknown): Message | null {
+  if (typeof eventData !== "string") {
     return null;
   }
 
-  return dataLines.join("\n");
+  const parsed = JSON.parse(eventData) as WebSocketPayload | Message;
+
+  if (
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "content" in parsed &&
+    "createdAt" in parsed &&
+    "role" in parsed &&
+    "type" in parsed
+  ) {
+    return parsed as Message;
+  }
+
+  const payload = parsed as WebSocketPayload;
+
+  return {
+    role: payload.role ?? "assistant",
+    type: payload.type ?? "text",
+    content: payload.payload ?? payload.message ?? payload.content ?? "",
+    createdAt: payload.createdAt ?? new Date().toISOString(),
+  };
 }
 
-function isConnectionAck(payload: string): boolean {
-  try {
-    const parsed = JSON.parse(payload) as unknown;
-    return (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "connected" in parsed &&
-      parsed.connected === true
-    );
-  } catch {
-    return false;
-  }
-}
-
-function parseAsJsonOrThrow(str: string) {
-  try {
-    return JSON.parse(str);
-  } catch (e) {
-    throw new Error(`Unable to parse ${str}`);
-  }
-}
-
-async function readEventStream(
-  response: Response,
-  onMessage: (message: Message) => void,
-): Promise<void> {
-  const reader = response.body?.getReader();
-
-  if (!reader) {
-    throw new Error("Conversation response did not include a stream");
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-
-    const events = buffer.split(/\r?\n\r?\n/);
-    buffer = events.pop() ?? "";
-
-    for (const event of events) {
-      let payload = parseSseEvent(event);
-
-      if (payload && !isConnectionAck(payload)) {
-        onMessage(parseAsJsonOrThrow(payload));
-      }
-    }
-  }
-
-  buffer += decoder.decode();
-
-  if (buffer.trim()) {
-    const payload = parseSseEvent(buffer);
-
-    if (payload && !isConnectionAck(payload)) {
-      onMessage(parseAsJsonOrThrow(payload));
-    }
-  }
-}
-
-export function useConversationStream() {
+export function useConversationStream(conversationId?: string) {
   const abortControllerRef = useRef<AbortController | null>(null);
+  const webSocketRef = useRef<WebSocket | null>(null);
   const [state, setState] = useState<ConversationStreamState>({
     error: null,
     isStreaming: false,
     streamedMessages: [],
   });
+
+  const connectToConversation = useCallback((nextConversationId: string) => {
+    webSocketRef.current?.close();
+
+    const websocket = new WebSocket(
+      getConversationWebSocketUrl(nextConversationId),
+    );
+    webSocketRef.current = websocket;
+
+    websocket.onmessage = (event) => {
+      try {
+        const message = parseWebSocketMessage(event.data);
+
+        if (!message) {
+          return;
+        }
+
+        setState((current) => ({
+          ...current,
+          isStreaming: false,
+          streamedMessages: [...current.streamedMessages, message],
+        }));
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          error:
+            error instanceof Error
+              ? error
+              : new Error("Failed to read websocket message"),
+          isStreaming: false,
+        }));
+      }
+    };
+
+    websocket.onerror = () => {
+      setState((current) => ({
+        ...current,
+        error: new Error("Conversation websocket connection failed"),
+        isStreaming: false,
+      }));
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!conversationId) {
+      return;
+    }
+
+    connectToConversation(conversationId);
+
+    return () => {
+      webSocketRef.current?.close();
+      webSocketRef.current = null;
+    };
+  }, [connectToConversation, conversationId]);
 
   const sendMessage = useCallback(
     async (message: string, options: ConversationStreamOptions = {}) => {
@@ -130,42 +175,42 @@ export function useConversationStream() {
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      const userMessage = createMessage("user", trimmedMessage);
 
       setState({
         error: null,
         isStreaming: true,
-        streamedMessages: [createMessage("user", trimmedMessage)],
+        streamedMessages: [userMessage],
       });
 
       try {
-        const response = await apiFetch("/api/conversation", {
-          body: JSON.stringify({ message: trimmedMessage }),
-          headers: {
-            "Content-Type": "application/json",
+        const activeConversationId = options.conversationId ?? conversationId;
+        const response = await apiFetch(
+          activeConversationId
+            ? `/api/conversation/${encodeURIComponent(activeConversationId)}`
+            : "/api/conversation",
+          {
+            body: JSON.stringify({ message: trimmedMessage }),
+            headers: {
+              "Content-Type": "application/json",
+            },
+            method: "POST",
+            signal: abortController.signal,
           },
-          method: "POST",
-          signal: abortController.signal,
-        });
+        );
 
         if (!response.ok) {
           throw new Error(`Conversation failed: ${response.status}`);
         }
 
-        await readEventStream(response, (message) => {
-          setState((current) => ({
-            ...current,
-            streamedMessages: [...current.streamedMessages, message],
-          }));
-        });
+        const payload = (await response.json()) as unknown;
 
-        await options.onComplete?.();
+        if (!isConversationStartResponse(payload)) {
+          throw new Error("Conversation response did not include preview data");
+        }
 
-        setState((current) => ({
-          ...current,
-          error: null,
-          isStreaming: false,
-          streamedMessages: [],
-        }));
+        connectToConversation(payload.conversationId);
+        await options.onConversationStarted?.({ ...payload, userMessage });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -183,7 +228,7 @@ export function useConversationStream() {
         }
       }
     },
-    [],
+    [connectToConversation, conversationId],
   );
 
   return {
