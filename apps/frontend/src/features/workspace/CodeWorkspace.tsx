@@ -1,5 +1,4 @@
 import type { ProjectFile } from "@repo/shared";
-import { useMemo } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { buildFileTreeRows } from "./fileTree";
 
@@ -26,7 +25,7 @@ export function CodeWorkspace({
   onSelectFile: (path: string) => void;
   selectedFile?: ProjectFile;
 }) {
-  const treeRows = useMemo(() => buildFileTreeRows(files), [files]);
+  const treeRows = buildFileTreeRows(files);
   const codeLines = fileContent?.split("\n") ?? [];
 
   return (

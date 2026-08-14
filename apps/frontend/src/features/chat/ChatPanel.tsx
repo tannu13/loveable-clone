@@ -1,10 +1,11 @@
 import type { Message } from "@repo/shared";
-import { type SubmitEventHandler, useMemo, useRef, useState } from "react";
+import { type SubmitEventHandler, useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import type { UserIdentity } from "../../lib/identity";
 import { IdentityPanel } from "../identity/IdentityPanel";
 import { buildRenderableMessages } from "./renderableMessages";
 import { RenderMessage } from "./RenderMessage";
+import { StreamingIndicator } from "./StreamingIndicator";
 
 export function ChatPanel({
   error,
@@ -28,10 +29,7 @@ export function ChatPanel({
   const [prompt, setPrompt] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const canSend = prompt.trim().length > 0 && !isStreaming;
-  const renderableMessages = useMemo(
-    () => buildRenderableMessages(messages),
-    [messages],
-  );
+  const renderableMessages = buildRenderableMessages(messages);
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
@@ -75,13 +73,16 @@ export function ChatPanel({
             detail="Messages from the project API will appear here."
           />
         ) : (
-          renderableMessages.map(({ isStickyPlan, message }, index) => (
-            <RenderMessage
-              key={`${message.role}-${message.createdAt}-${index}`}
-              isStickyPlan={isStickyPlan}
-              message={message}
-            />
-          ))
+          <>
+            {renderableMessages.map(({ isStickyPlan, message }, index) => (
+              <RenderMessage
+                key={`${message.role}-${message.createdAt}-${index}`}
+                isStickyPlan={isStickyPlan}
+                message={message}
+              />
+            ))}
+            {isStreaming ? <StreamingIndicator /> : null}
+          </>
         )}
         <div ref={messagesEndRef} />
       </div>

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   fetchConversationDetails,
@@ -56,10 +56,7 @@ export function WorkspaceRoute() {
     projectQuery.data.hasStartedBuildingApp;
 
   const files = projectQuery.data?.files ?? [];
-  const selectedFile = useMemo(
-    () => files.find((file) => file.path === selectedFilePath),
-    [files, selectedFilePath],
-  );
+  const selectedFile = files.find((file) => file.path === selectedFilePath);
 
   useEffect(() => {
     if (
@@ -92,54 +89,45 @@ export function WorkspaceRoute() {
     return "Synced";
   })();
 
-  const displayedMessages = useMemo(
-    () => [
-      ...(projectQuery.data?.messageHistory ?? []),
-      ...conversationStream.streamedMessages,
-    ],
-    [conversationStream.streamedMessages, projectQuery.data?.messageHistory],
-  );
+  const displayedMessages = [
+    ...(projectQuery.data?.messageHistory ?? []),
+    ...conversationStream.streamedMessages,
+  ];
 
-  const handleSendMessage = useCallback(
-    (message: string) => {
-      void conversationStream.sendMessage(message, {
-        conversationId: routeConversationId,
-        onConversationStarted: ({
-          conversationId: startedConversationId,
-          previewUrl,
-          userMessage,
-        }) => {
-          if (routeConversationId) {
-            return;
-          }
+  const handleSendMessage = (message: string) => {
+    void conversationStream.sendMessage(message, {
+      conversationId: routeConversationId,
+      onConversationStarted: ({
+        conversationId: startedConversationId,
+        previewUrl,
+        userMessage,
+      }) => {
+        if (routeConversationId) {
+          return;
+        }
 
-          queryClient.setQueryData(
-            ["conversation-details", startedConversationId],
-            {
-              conversationId: startedConversationId,
-              files: [],
-              hasStartedBuildingApp: false,
-              messageHistory: [],
-              previewUrl,
-              summary: "Project conversation",
-              updatedAt: userMessage.createdAt,
-            },
-          );
+        queryClient.setQueryData(
+          ["conversation-details", startedConversationId],
+          {
+            conversationId: startedConversationId,
+            files: [],
+            hasStartedBuildingApp: false,
+            messageHistory: [],
+            previewUrl,
+            summary: "Project conversation",
+            updatedAt: userMessage.createdAt,
+          },
+        );
 
-          navigate(`/${startedConversationId}`);
-        },
-      });
-    },
-    [routeConversationId, conversationStream, navigate, queryClient],
-  );
+        navigate(`/${startedConversationId}`);
+      },
+    });
+  };
 
-  const handleIdentityChange = useCallback(
-    (nextIdentity: UserIdentity) => {
-      setIdentity(nextIdentity);
-      void projectQuery.refetch();
-    },
-    [projectQuery],
-  );
+  const handleIdentityChange = (nextIdentity: UserIdentity) => {
+    setIdentity(nextIdentity);
+    void projectQuery.refetch();
+  };
 
   if (!hasSession) {
     return <LandingPage onStart={() => setHasSession(true)} />;
