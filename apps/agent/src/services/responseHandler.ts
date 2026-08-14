@@ -4,12 +4,11 @@ import env from "../env";
 import type { Content } from "@google/genai";
 import { getCurrentFormattedDate } from "../utils/helpers";
 import type { TUploadToS3 } from "./s3Service";
-import db from "@repo/db";
-import { messageHistory } from "@repo/db/schema";
 import {
   cleanupWorktree,
   createDiffArtifact,
 } from "../utils/git-worktree-utils";
+import { saveMessageHistory } from "../models/dbWriter";
 
 type TDB = {
   type: Message["type"];
@@ -76,17 +75,12 @@ export class UserResponseHandler implements ResponseLifeCycle {
     metadata?: unknown;
     role?: Message["role"];
   }) {
-    try {
-      await db.insert(messageHistory).values({
-        conversationId: env.CONVERSATION_ID,
-        content,
-        role,
-        type,
-        metadata,
-      });
-    } catch (err) {
-      console.error("Message history write failed", err);
-    }
+    await saveMessageHistory({
+      type,
+      content,
+      metadata,
+      role,
+    });
   }
 }
 

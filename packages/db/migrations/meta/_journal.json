@@ -15,6 +15,13 @@
       "when": 1785680827940,
       "tag": "0001_closed_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786706990435,
+      "tag": "0002_keen_aaron_stack",
+      "breakpoints": true
     }
   ]
 }

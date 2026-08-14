@@ -8,6 +8,7 @@ import {
   type TRunnerStartResponse,
 } from "../appRunnerClient";
 import { s3Service } from "../s3Service";
+import { toggleConversationAppFlag } from "../../models/dbWriter";
 
 type SupportedLibrary = "react" | "vue";
 type FailedStep =
@@ -106,6 +107,7 @@ function buildResponse({
 
 /**
  * main responsibilities
+ * - Update the conversations table's flag `hasStartedBuildingApp`: true
  * - Download template.
  * - Run bun install.
  * - Call runner POST /start.
@@ -113,6 +115,8 @@ function buildResponse({
  * - Return everything useful to the LLM.
  */
 export async function startBuildingApp(library: SupportedLibrary) {
+  await toggleConversationAppFlag();
+
   const templateName = `${library}-starter-template.zip`;
   const workspaceDirectory =
     await s3Service.downloadTemplateFromS3(templateName);

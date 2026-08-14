@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "has_started_building_app" boolean DEFAULT false NOT NULL;

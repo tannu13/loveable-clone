@@ -30,6 +30,9 @@ export const conversations = pgTable(
       .notNull()
       .references(() => users.id),
     title: varchar("title", { length: 255 }),
+    hasStartedBuildingApp: boolean("has_started_building_app")
+      .default(false)
+      .notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
