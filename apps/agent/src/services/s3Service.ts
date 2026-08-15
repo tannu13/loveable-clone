@@ -5,7 +5,6 @@ import {
   HeadObjectCommand,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
-import { Readable } from "stream";
 import * as unzipper from "unzipper";
 import env from "../env";
 import { getMainRepoPath } from "../utils/helpers";
@@ -120,10 +119,15 @@ class S3Service {
         throw new Error("response.Body is undefined");
       }
 
-      const stream = response.Body as Readable;
-
-      // Extract contents directly into the local target directory
-      await stream.pipe(unzipper.Extract({ path: outputDirectory })).promise();
+      // unzipper.Extract() streams entries off the zip sequentially and can
+      // silently stop partway through on archives with many entries (e.g.
+      // our templates, which intentionally include a full .git/ directory)
+      // without raising an error - the promise still resolves as if nothing
+      // went wrong. Reading the whole zip into a buffer and extracting via
+      // the central directory (Open.buffer) is not subject to that bug.
+      const zipBytes = await response.Body.transformToByteArray();
+      const directory = await unzipper.Open.buffer(Buffer.from(zipBytes));
+      await directory.extract({ path: outputDirectory });
 
       console.log(
         `Starter template files successfully downloaded and extracted to: ${outputDirectory}`,
