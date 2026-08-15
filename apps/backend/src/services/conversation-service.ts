@@ -9,6 +9,7 @@ import type { K8Service } from "./k8sService";
 import type { TRedisMessageSchema } from "@repo/shared";
 import { setSpanAttributes, withActiveSpan } from "@repo/observability";
 import { logger } from "../logger";
+import { toWireMessages } from "./message-history-mapper";
 
 export class ConversationService {
   private publisher: RedisClientType;
@@ -26,7 +27,16 @@ export class ConversationService {
   }
 
   async getMessage(id: string, userId: string) {
-    return await getConversation(id, userId);
+    const conversation = await getConversation(id, userId);
+
+    if (!conversation) {
+      return conversation;
+    }
+
+    return {
+      ...conversation,
+      messageHistory: toWireMessages(conversation.messageHistory),
+    };
   }
 
   async handleMessage(

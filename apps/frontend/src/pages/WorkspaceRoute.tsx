@@ -211,6 +211,7 @@ export function WorkspaceRoute() {
             </section>
 
             <ChatPanel
+              conversationId={routeConversationId}
               error={conversationStream.error}
               identity={identity}
               isLoading={projectQuery.isLoading}
@@ -223,6 +224,7 @@ export function WorkspaceRoute() {
         ) : (
           <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-hidden">
             <ChatPanel
+              conversationId={routeConversationId}
               error={conversationStream.error}
               identity={identity}
               isLoading={projectQuery.isLoading}

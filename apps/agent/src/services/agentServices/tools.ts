@@ -7,7 +7,13 @@ import {
   readProjectFile,
   writeProjectFile,
 } from "./projectFiles";
-import { QnASchema } from "@repo/shared";
+import {
+  QnASchema,
+  qnaAskCodec,
+  planAskCodec,
+  type QnAAskPayload,
+  type PlanAskPayload,
+} from "@repo/shared";
 import type { ResponseLifeCycle } from "../responseHandler";
 import { startBuildingApp } from "./startBuildingApp";
 import { fetchRunnerLogsAfterDelay } from "./runnerLogs";
@@ -316,19 +322,17 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
     return `Need more info, asking question(s) to user`;
   },
   execute: async (args, _workspace, responseHandler) => {
-    const correlationId = crypto.randomUUID();
-    responseHandler.send("qna", {
-      correlationId,
+    // Built once and reused for both the live emit and the DB write so the
+    // two can never diverge — see qnaAskCodec in @repo/shared.
+    const payload: QnAAskPayload = {
+      correlationId: crypto.randomUUID(),
       questions: args.questions,
-    });
+    };
 
-    await responseHandler.saveToDB({
-      type: "qna",
-      content: "",
-      metadata: args.questions,
-    });
+    responseHandler.send("qna", payload);
+    await responseHandler.saveToDB({ type: "qna", ...qnaAskCodec.toRow(payload) });
 
-    const userAnswer = await waitForResponse(correlationId);
+    const userAnswer = await waitForResponse(payload.correlationId);
     await responseHandler.saveToDB({
       type: "qna",
       content: "",
@@ -399,16 +403,15 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
     return `Finalizing plan...`;
   },
   execute: async (args, _workspace, responseHandler) => {
-    responseHandler.send("plan", {
+    // Same pattern as qnaTool: one payload feeds both the live emit and the
+    // DB write — see planAskCodec in @repo/shared.
+    const payload: PlanAskPayload = {
       explanation: args.explanation,
       plan: args.plan,
-    });
+    };
 
-    await responseHandler.saveToDB({
-      type: "plan",
-      content: args.explanation ?? "",
-      metadata: args.plan,
-    });
+    responseHandler.send("plan", payload);
+    await responseHandler.saveToDB({ type: "plan", ...planAskCodec.toRow(payload) });
 
     return { message: "Plan updates sent to user" };
   },

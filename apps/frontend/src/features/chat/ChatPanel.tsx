@@ -1,5 +1,10 @@
 import type { Message } from "@repo/shared";
-import { type SubmitEventHandler, useRef, useState } from "react";
+import {
+  type KeyboardEventHandler,
+  type SubmitEventHandler,
+  useRef,
+  useState,
+} from "react";
 import { EmptyState } from "../../components/EmptyState";
 import type { UserIdentity } from "../../lib/identity";
 import { IdentityPanel } from "../identity/IdentityPanel";
@@ -8,6 +13,7 @@ import { RenderMessage } from "./RenderMessage";
 import { StreamingIndicator } from "./StreamingIndicator";
 
 export function ChatPanel({
+  conversationId,
   error,
   identity,
   isLoading,
@@ -17,6 +23,7 @@ export function ChatPanel({
   onSendMessage,
   variant = "sidebar",
 }: {
+  conversationId: string | undefined;
   error: Error | null;
   identity: UserIdentity;
   isLoading: boolean;
@@ -28,7 +35,7 @@ export function ChatPanel({
 }) {
   const [prompt, setPrompt] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const canSend = prompt.trim().length > 0 && !isStreaming;
+  const canSend = prompt.trim().length > 0;
   const renderableMessages = buildRenderableMessages(messages);
 
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = (event) => {
@@ -36,12 +43,21 @@ export function ChatPanel({
 
     const message = prompt.trim();
 
-    if (!message || isStreaming) {
+    if (!message) {
       return;
     }
 
     setPrompt("");
     onSendMessage(message);
+  };
+
+  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (
+    event,
+  ) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
   };
 
   return (
@@ -76,6 +92,7 @@ export function ChatPanel({
           <>
             {renderableMessages.map(({ isStickyPlan, message }, index) => (
               <RenderMessage
+                conversationId={conversationId}
                 key={`${message.role}-${message.createdAt}-${index}`}
                 isStickyPlan={isStickyPlan}
                 message={message}
@@ -94,9 +111,9 @@ export function ChatPanel({
         <div className="rounded-lg border border-(--border) bg-(--control) p-2 focus-within:border-(--accent)">
           <textarea
             className="h-24 w-full resize-none bg-transparent px-2 py-1 text-sm leading-6 text-(--text) outline-none placeholder:text-(--muted)"
-            disabled={isStreaming}
             id="prompt"
             onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Ask the assistant to change the UI..."
             value={prompt}
           />
@@ -113,7 +130,7 @@ export function ChatPanel({
               disabled={!canSend}
               type="submit"
             >
-              {isStreaming ? "Sending" : "Send"}
+              Send
             </button>
           </div>
         </div>

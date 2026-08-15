@@ -61,7 +61,13 @@ function isConversationStartResponse(
 }
 
 export function useConversationStream(conversationId?: string) {
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Guards only the "no conversation yet" case: the first message of a new
+  // conversation has no id to key requests on, so firing it twice in quick
+  // succession (before the first POST returns and the id is known) would
+  // create two separate conversations. Once a conversationId exists, sends
+  // are independent, idempotent enqueues and are free to overlap — nothing
+  // here should block or cancel them.
+  const isCreatingConversationRef = useRef(false);
   const [state, setState] = useState<ConversationStreamState>({
     error: null,
     isStreaming: false,
@@ -123,10 +129,12 @@ export function useConversationStream(conversationId?: string) {
       return;
     }
 
-    abortControllerRef.current?.abort();
+    const activeConversationId = options.conversationId ?? conversationId;
 
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    if (!activeConversationId && isCreatingConversationRef.current) {
+      return;
+    }
+
     const userMessage = createMessage("user", trimmedMessage);
 
     setState((current) => ({
@@ -135,8 +143,11 @@ export function useConversationStream(conversationId?: string) {
       streamedMessages: [...current.streamedMessages, userMessage],
     }));
 
+    if (!activeConversationId) {
+      isCreatingConversationRef.current = true;
+    }
+
     try {
-      const activeConversationId = options.conversationId ?? conversationId;
       const response = await apiFetch(
         activeConversationId
           ? `/api/conversation/${encodeURIComponent(activeConversationId)}`
@@ -147,7 +158,6 @@ export function useConversationStream(conversationId?: string) {
             "Content-Type": "application/json",
           },
           method: "POST",
-          signal: abortController.signal,
         },
       );
 
@@ -164,10 +174,6 @@ export function useConversationStream(conversationId?: string) {
       conversationSocketClient.connect(payload.conversationId);
       await options.onConversationStarted?.({ ...payload, userMessage });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-
       setState((current) => ({
         ...current,
         error:
@@ -175,8 +181,8 @@ export function useConversationStream(conversationId?: string) {
         isStreaming: false,
       }));
     } finally {
-      if (abortControllerRef.current === abortController) {
-        abortControllerRef.current = null;
+      if (!activeConversationId) {
+        isCreatingConversationRef.current = false;
       }
     }
   };

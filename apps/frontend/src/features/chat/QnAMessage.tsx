@@ -8,7 +8,10 @@ type QnAQuestion = {
 };
 
 type QnAContent = {
-  correlationId: string;
+  // null means this row predates correlationId being persisted (see
+  // qnaAskCodec in @repo/shared) — it can never be answered again, so it's
+  // rendered read-only/expired instead of as a live question.
+  correlationId: string | null;
   questions: QnAQuestion[];
 };
 
@@ -74,10 +77,15 @@ function parseQnAContent(content: unknown): QnAContent | null {
     questions?: unknown;
   };
 
-  if (
-    typeof candidate.correlationId !== "string" ||
-    !Array.isArray(candidate.questions)
-  ) {
+  const correlationId =
+    candidate.correlationId === null
+      ? null
+      : typeof candidate.correlationId === "string" &&
+          candidate.correlationId.length > 0
+        ? candidate.correlationId
+        : undefined;
+
+  if (correlationId === undefined || !Array.isArray(candidate.questions)) {
     return null;
   }
 
@@ -108,32 +116,43 @@ function parseQnAContent(content: unknown): QnAContent | null {
   }
 
   return {
-    correlationId: candidate.correlationId,
+    correlationId,
     questions,
   };
 }
 
 async function sendUserReply({
   answers,
+  conversationId,
   correlationId,
 }: {
   answers: UserAnswer[];
+  conversationId: string;
   correlationId: string;
 }) {
-  const response = await apiFetch("/api/user-reply", {
-    body: JSON.stringify({ answers, correlationId }),
-    headers: {
-      "Content-Type": "application/json",
+  const response = await apiFetch(
+    `/api/conversation/${conversationId}/qna-reply`,
+    {
+      body: JSON.stringify({ answers, correlationId }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
     },
-    method: "POST",
-  });
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to send answers: ${response.status}`);
   }
 }
 
-export function QnAMessage({ content }: { content: unknown }) {
+export function QnAMessage({
+  content,
+  conversationId,
+}: {
+  content: unknown;
+  conversationId: string | undefined;
+}) {
   const parsedContent = parseQnAContent(content);
 
   if (!parsedContent) {
@@ -148,13 +167,21 @@ export function QnAMessage({ content }: { content: unknown }) {
 
   return (
     <div className="flex justify-start">
-      <QnACard content={parsedContent} />
+      <QnACard content={parsedContent} conversationId={conversationId} />
     </div>
   );
 }
 
-function QnACard({ content }: { content: QnAContent }) {
-  const storedAnswers = getStoredAnswers(content.correlationId);
+function QnACard({
+  content,
+  conversationId,
+}: {
+  content: QnAContent;
+  conversationId: string | undefined;
+}) {
+  const { correlationId } = content;
+  const isExpired = correlationId === null;
+  const storedAnswers = correlationId ? getStoredAnswers(correlationId) : null;
   const [activeIndex, setActiveIndex] = useState(0);
   const [answersByQuestion, setAnswersByQuestion] = useState<
     Record<number, string>
@@ -185,6 +212,10 @@ function QnACard({ content }: { content: QnAContent }) {
   const allQuestionsAnswered = answeredCount === content.questions.length;
 
   const handleSelectOption = (option: string) => {
+    if (isExpired) {
+      return;
+    }
+
     setAnswersByQuestion((current) => ({
       ...current,
       [activeIndex]: option,
@@ -201,7 +232,17 @@ function QnACard({ content }: { content: QnAContent }) {
   };
 
   const handleSubmitAnswers = async () => {
-    if (!allQuestionsAnswered || isSubmitting || isSubmitted) {
+    if (
+      correlationId === null ||
+      !allQuestionsAnswered ||
+      isSubmitting ||
+      isSubmitted
+    ) {
+      return;
+    }
+
+    if (!conversationId) {
+      setSubmitError(new Error("Missing conversation id"));
       return;
     }
 
@@ -216,9 +257,10 @@ function QnACard({ content }: { content: QnAContent }) {
     try {
       await sendUserReply({
         answers,
-        correlationId: content.correlationId,
+        conversationId,
+        correlationId,
       });
-      storeAnswers(content.correlationId, answers);
+      storeAnswers(correlationId, answers);
       setIsSubmitted(true);
     } catch (error) {
       setSubmitError(
@@ -244,7 +286,11 @@ function QnACard({ content }: { content: QnAContent }) {
           <p className="text-xs font-medium uppercase tracking-wide text-(--muted)">
             Question {activeIndex + 1} of {content.questions.length}
           </p>
-          {isSubmitted ? (
+          {isExpired ? (
+            <span className="rounded-full bg-(--control) px-2 py-0.5 text-xs font-medium text-(--muted)">
+              Expired
+            </span>
+          ) : isSubmitted ? (
             <span className="rounded-full bg-(--success-soft) px-2 py-0.5 text-xs font-medium text-(--success)">
               Sent
             </span>
@@ -266,7 +312,7 @@ function QnACard({ content }: { content: QnAContent }) {
                   ? "border-(--accent) bg-(--selected) text-(--text)"
                   : "border-(--border) bg-transparent text-(--text) hover:bg-(--control)"
               } disabled:cursor-not-allowed disabled:opacity-70`}
-              disabled={isSubmitting || isSubmitted}
+              disabled={isExpired || isSubmitting || isSubmitted}
               key={option}
               onClick={() => handleSelectOption(option)}
               type="button"
@@ -325,7 +371,7 @@ function QnACard({ content }: { content: QnAContent }) {
             >
               Back
             </button>
-            {isLastQuestion ? (
+            {isExpired ? null : isLastQuestion ? (
               <button
                 className="h-8 rounded-md bg-(--accent) px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55"
                 disabled={!allQuestionsAnswered || isSubmitting || isSubmitted}
@@ -351,7 +397,12 @@ function QnACard({ content }: { content: QnAContent }) {
           </div>
         </div>
 
-        {submitError ? (
+        {isExpired ? (
+          <p className="mt-2 text-xs leading-5 text-(--muted)">
+            This questionnaire is from an earlier session and can no longer
+            be answered.
+          </p>
+        ) : submitError ? (
           <p className="mt-2 text-xs leading-5 text-red-500">
             {submitError.message}
           </p>
