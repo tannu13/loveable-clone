@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
-import type { TConversationSchema } from "../types/validations";
+import type {
+  TConversationSchema,
+  TReadFileQuerySchema,
+} from "../types/validations";
 import type { ConversationService } from "../services/conversation-service";
 import type { TQnAReplySchema } from "@repo/shared";
 import { UnauthorizedError } from "../utils/custom-errors";
@@ -49,6 +52,34 @@ export const createControllers = (service: ConversationService) => {
     return res.status(200).json({ ok: true });
   };
 
-  return { converse, qnaReply, getConversation };
+  const listFiles = async (req: Request, res: Response) => {
+    const conversationId = req.params.id as string;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedError();
+    }
+
+    await service.requestFileList(conversationId, userId);
+
+    return res.status(202).json({ ok: true });
+  };
+
+  const readFile = async (req: Request, res: Response) => {
+    const conversationId = req.params.id as string;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedError();
+    }
+
+    const { path } = req.validated?.query as TReadFileQuerySchema;
+
+    await service.requestFileContent(conversationId, userId, path);
+
+    return res.status(202).json({ ok: true });
+  };
+
+  return { converse, qnaReply, getConversation, listFiles, readFile };
 };
 export type TControllers = ReturnType<typeof createControllers>;

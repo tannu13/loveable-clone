@@ -1,18 +1,17 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  fetchConversationDetails,
-  fetchProjectSnapshot,
-  HttpError,
-} from "../api/conversations";
-import { fetchProjectFileContent } from "../api/projectFiles";
+import { fetchConversationDetails, HttpError } from "../api/conversations";
 import { ChatPanel } from "../features/chat/ChatPanel";
 import { CodeWorkspace } from "../features/workspace/CodeWorkspace";
 import { PreviewWorkspace } from "../features/workspace/PreviewWorkspace";
 import { useConversationStream } from "../hooks/useConversationStream";
 import { getStoredIdentity, type UserIdentity } from "../lib/identity";
 import { hasStoredSessionToken } from "../lib/session";
+import {
+  requestFileContent,
+  requestFileList,
+} from "../lib/websocket/workspaceFileClient";
 import type { ViewMode } from "../types/view";
 import { LandingPage } from "./LandingPage";
 
@@ -29,14 +28,9 @@ export function WorkspaceRoute() {
   const queryClient = useQueryClient();
 
   const projectQuery = useQuery({
-    enabled: hasSession,
-    queryKey: routeConversationId
-      ? ["conversation-details", routeConversationId]
-      : ["project"],
-    queryFn: () =>
-      routeConversationId
-        ? fetchConversationDetails(routeConversationId)
-        : fetchProjectSnapshot(),
+    enabled: hasSession && Boolean(routeConversationId),
+    queryKey: ["conversation-details", routeConversationId],
+    queryFn: () => fetchConversationDetails(routeConversationId!),
   });
   const conversationStream = useConversationStream(routeConversationId);
 
@@ -50,12 +44,17 @@ export function WorkspaceRoute() {
     }
   }, [navigate, projectQuery.error, routeConversationId]);
 
-  const hasStartedBuildingApp =
-    projectQuery.data !== undefined &&
-    "hasStartedBuildingApp" in projectQuery.data &&
-    projectQuery.data.hasStartedBuildingApp;
+  const hasStartedBuildingApp = projectQuery.data?.hasStartedBuildingApp ?? false;
 
-  const files = projectQuery.data?.files ?? [];
+  const filesQuery = useQuery({
+    enabled: Boolean(
+      hasSession && routeConversationId && hasStartedBuildingApp,
+    ),
+    queryKey: ["conversation-files", routeConversationId],
+    queryFn: () => requestFileList(routeConversationId!),
+  });
+
+  const files = filesQuery.data ?? [];
   const selectedFile = files.find((file) => file.path === selectedFilePath);
 
   useEffect(() => {
@@ -68,9 +67,9 @@ export function WorkspaceRoute() {
   }, [files, selectedFilePath]);
 
   const selectedFileContentQuery = useQuery({
-    enabled: hasSession && Boolean(selectedFile?.path),
-    queryKey: ["project-file-content", selectedFile?.path],
-    queryFn: () => fetchProjectFileContent(selectedFile!.path),
+    enabled: hasSession && Boolean(routeConversationId) && Boolean(selectedFile?.path),
+    queryKey: ["project-file-content", routeConversationId, selectedFile?.path],
+    queryFn: () => requestFileContent(routeConversationId!, selectedFile!.path),
   });
 
   const statusLabel = (() => {
@@ -126,7 +125,9 @@ export function WorkspaceRoute() {
 
   const handleIdentityChange = (nextIdentity: UserIdentity) => {
     setIdentity(nextIdentity);
-    void projectQuery.refetch();
+    if (routeConversationId) {
+      void projectQuery.refetch();
+    }
   };
 
   if (!hasSession) {
@@ -189,14 +190,14 @@ export function WorkspaceRoute() {
             <section className="min-h-0 overflow-hidden p-3 sm:p-4">
               {viewMode === "code" ? (
                 <CodeWorkspace
-                  error={projectQuery.error}
+                  error={filesQuery.error}
                   files={files}
                   fileContent={selectedFileContentQuery.data}
                   fileContentError={selectedFileContentQuery.error}
-                  isError={projectQuery.isError}
+                  isError={filesQuery.isError}
                   isFileContentError={selectedFileContentQuery.isError}
                   isFileContentLoading={selectedFileContentQuery.isLoading}
-                  isLoading={projectQuery.isLoading}
+                  isLoading={filesQuery.isLoading}
                   onSelectFile={setSelectedFilePath}
                   selectedFile={selectedFile}
                 />

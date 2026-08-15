@@ -1,6 +1,8 @@
+import type { ConversationStreamFrameType } from "@repo/shared";
+
 export type ConversationStreamFrame = {
   conversationId: string;
-  type: "text" | "qna" | "plan";
+  type: ConversationStreamFrameType;
   payload: unknown;
 };
 

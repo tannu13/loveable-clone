@@ -22,3 +22,8 @@ export const LoginSchema = z.object({
   username: z.string().trim().min(1, "Username is required"),
 });
 export type TLoginSchema = z.infer<typeof LoginSchema>;
+
+export const ReadFileQuerySchema = z.object({
+  path: z.string().min(1, "Path is mandatory"),
+});
+export type TReadFileQuerySchema = z.infer<typeof ReadFileQuerySchema>;

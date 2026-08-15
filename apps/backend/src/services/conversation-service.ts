@@ -98,4 +98,36 @@ export class ConversationService {
       JSON.stringify(answerPayload),
     );
   }
+
+  async requestFileList(conversationId: string, userId: string) {
+    await assertConversationBelongsToUser(conversationId, userId);
+
+    const jobPayload: TRedisMessageSchema = {
+      conversationId,
+      type: "list_files",
+      message: null,
+    };
+    await this.publisher.lPush(
+      `convo-request-${conversationId}`,
+      JSON.stringify(jobPayload),
+    );
+  }
+
+  async requestFileContent(
+    conversationId: string,
+    userId: string,
+    path: string,
+  ) {
+    await assertConversationBelongsToUser(conversationId, userId);
+
+    const jobPayload: TRedisMessageSchema = {
+      conversationId,
+      type: "read_file",
+      message: { path },
+    };
+    await this.publisher.lPush(
+      `convo-request-${conversationId}`,
+      JSON.stringify(jobPayload),
+    );
+  }
 }

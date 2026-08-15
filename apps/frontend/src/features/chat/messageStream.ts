@@ -1,13 +1,18 @@
 import type { Message } from "@repo/shared";
 import type { ConversationStreamFrame } from "../../lib/websocket/conversationSocketClient";
 
+// This module only ever handles chat frames ("text"|"qna"|"plan") — workspace
+// frames (file_list/file_content/workspace_error) are filtered out by
+// useConversationStream.ts before reaching these functions.
+export type ChatStreamFrame = ConversationStreamFrame & { type: Message["type"] };
+
 const STREAM_DONE_PAYLOAD = "[DONE]";
 
-export function isStreamDoneFrame(frame: ConversationStreamFrame): boolean {
+export function isStreamDoneFrame(frame: ChatStreamFrame): boolean {
   return frame.type === "text" && frame.payload === STREAM_DONE_PAYLOAD;
 }
 
-function frameToMessage(frame: ConversationStreamFrame): Message {
+function frameToMessage(frame: ChatStreamFrame): Message {
   return {
     role: "assistant",
     type: frame.type,
@@ -18,7 +23,7 @@ function frameToMessage(frame: ConversationStreamFrame): Message {
 
 function canMergeIntoLastMessage(
   lastMessage: Message | undefined,
-  frame: ConversationStreamFrame,
+  frame: ChatStreamFrame,
 ): lastMessage is Message & { content: string } {
   return (
     frame.type === "text" &&
@@ -41,7 +46,7 @@ function canMergeIntoLastMessage(
  */
 export function appendStreamFrame(
   messages: Message[],
-  frame: ConversationStreamFrame,
+  frame: ChatStreamFrame,
 ): Message[] {
   const lastMessage = messages[messages.length - 1];
 

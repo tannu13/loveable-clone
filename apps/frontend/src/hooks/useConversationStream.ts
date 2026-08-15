@@ -1,8 +1,15 @@
 import type { Message } from "@repo/shared";
 import { useEffect, useRef, useState } from "react";
-import { appendStreamFrame, isStreamDoneFrame } from "../features/chat/messageStream";
+import {
+  appendStreamFrame,
+  isStreamDoneFrame,
+  type ChatStreamFrame,
+} from "../features/chat/messageStream";
 import { apiFetch } from "../lib/api";
-import { conversationSocketClient } from "../lib/websocket/conversationSocketClient";
+import {
+  conversationSocketClient,
+  type ConversationStreamFrame,
+} from "../lib/websocket/conversationSocketClient";
 
 type ConversationStreamOptions = {
   conversationId?: string;
@@ -31,6 +38,12 @@ function createMessage(role: Message["role"], content: string): Message {
     content,
     createdAt: new Date().toISOString(),
   };
+}
+
+function isChatFrame(frame: ConversationStreamFrame): frame is ChatStreamFrame {
+  return (
+    frame.type === "text" || frame.type === "qna" || frame.type === "plan"
+  );
 }
 
 function isConversationStartResponse(
@@ -66,6 +79,12 @@ export function useConversationStream(conversationId?: string) {
     const unsubscribe = conversationSocketClient.subscribe({
       onMessage: (frame) => {
         if (frame.conversationId !== conversationId) {
+          return;
+        }
+
+        if (!isChatFrame(frame)) {
+          // Workspace frame (file_list/file_content/workspace_error) —
+          // handled by workspaceFileClient's own subscriber, not chat state.
           return;
         }
 

@@ -31,16 +31,6 @@ export class HttpError extends Error {
   }
 }
 
-export async function fetchProjectSnapshot(): Promise<ProjectSnapshot> {
-  const response = await apiFetch("/api/project");
-
-  if (!response.ok) {
-    throw new Error(`Failed to load project: ${response.status}`);
-  }
-
-  return response.json() as Promise<ProjectSnapshot>;
-}
-
 export async function fetchConversationDetails(
   conversationId: string,
 ): Promise<ConversationDetails> {

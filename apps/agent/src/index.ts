@@ -57,6 +57,11 @@ const harness = new Harness({
   pastHistory,
   workspace: getMainRepoPath(),
 });
-const worker = new WorkerService({ subscriber, harness });
+const worker = new WorkerService({
+  subscriber,
+  harness,
+  responseHandler,
+  workspace: getMainRepoPath(),
+});
 
 worker.listenForJobs();

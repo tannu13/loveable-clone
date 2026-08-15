@@ -1,4 +1,4 @@
-import type { Message } from "@repo/shared";
+import type { ConversationStreamFrameType, Message } from "@repo/shared";
 import type { RedisClientType } from "redis";
 import env from "../env";
 import type { Content } from "@google/genai";
@@ -17,7 +17,7 @@ type TDB = {
   role?: Message["role"];
 };
 export interface ResponseLifeCycle {
-  send(type: Message["type"], payload: unknown): Promise<void>;
+  send(type: ConversationStreamFrameType, payload: unknown): Promise<void>;
   end(data: { history: Content[]; db?: TDB }): Promise<void>;
   saveToDB(data: TDB): Promise<void>;
 }
@@ -31,7 +31,7 @@ export class UserResponseHandler implements ResponseLifeCycle {
     this.uploadToS3 = uploadToS3;
   }
 
-  async send(type: Message["type"], payload: unknown) {
+  async send(type: ConversationStreamFrameType, payload: unknown) {
     this.publisher.publish(
       `convo-response`,
       JSON.stringify({ conversationId: env.CONVERSATION_ID, type, payload }),
@@ -105,7 +105,7 @@ export class SubAgentResponseHandler implements ResponseLifeCycle {
     // tbd
     return;
   }
-  async send(type: Message["type"], payload: unknown) {
+  async send(type: ConversationStreamFrameType, payload: unknown) {
     // tbd
   }
 
