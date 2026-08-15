@@ -1,5 +1,13 @@
 import { useState } from "react";
 import { deleteConversation } from "../../api/conversations";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
 
 export function DeleteConversationDialog({
   conversationId,
@@ -37,31 +45,24 @@ export function DeleteConversationDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-(--border) bg-(--panel) p-4 shadow-xl">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-base font-semibold">Delete conversation</h2>
-          <button
-            aria-label="Close"
-            className="grid size-8 shrink-0 place-items-center rounded-md text-(--muted) transition hover:bg-(--control) hover:text-(--text)"
-            disabled={isDeleting}
-            onClick={onClose}
-            type="button"
-          >
-            x
-          </button>
-        </div>
+    <Dialog onOpenChange={(open) => (open ? null : onClose())} open>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete conversation</DialogTitle>
+        </DialogHeader>
 
-        <p className="mt-3 text-sm leading-6 text-(--muted)">
+        <DialogDescription>
           Delete <span className="font-medium text-(--text)">"{title}"</span>?
           This can't be undone.
-        </p>
+        </DialogDescription>
 
         {error ? (
-          <p className="mt-2 text-xs leading-5 text-red-500">{error.message}</p>
+          <p className="mt-2 text-xs leading-5 text-red-500">
+            {error.message}
+          </p>
         ) : null}
 
-        <div className="mt-4 flex justify-end gap-2">
+        <DialogFooter>
           <button
             className="h-9 rounded-md border border-(--border) px-4 text-sm font-medium text-(--text) transition hover:bg-(--control) disabled:cursor-not-allowed disabled:opacity-55"
             disabled={isDeleting}
@@ -78,8 +79,8 @@ export function DeleteConversationDialog({
           >
             {isDeleting ? "Deleting" : "Delete"}
           </button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
