@@ -1,8 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchConversationDetails, HttpError } from "../api/conversations";
 import { ChatPanel } from "../features/chat/ChatPanel";
+import { mergeMessageHistory } from "../features/chat/messageDedupe";
+import { ConversationSidebar } from "../features/conversations/ConversationSidebar";
 import { CodeWorkspace } from "../features/workspace/CodeWorkspace";
 import { PreviewWorkspace } from "../features/workspace/PreviewWorkspace";
 import { useConversationStream } from "../hooks/useConversationStream";
@@ -88,10 +90,10 @@ export function WorkspaceRoute() {
     return "Synced";
   })();
 
-  const displayedMessages = [
-    ...(projectQuery.data?.messageHistory ?? []),
-    ...conversationStream.streamedMessages,
-  ];
+  const displayedMessages = mergeMessageHistory(
+    projectQuery.data?.messageHistory ?? [],
+    conversationStream.streamedMessages,
+  );
 
   const handleSendMessage = (message: string) => {
     void conversationStream.sendMessage(message, {
@@ -117,6 +119,7 @@ export function WorkspaceRoute() {
             updatedAt: userMessage.createdAt,
           },
         );
+        void queryClient.invalidateQueries({ queryKey: ["conversations"] });
 
         navigate(`/${startedConversationId}`);
       },
@@ -135,10 +138,12 @@ export function WorkspaceRoute() {
   }
 
   return (
-    <main className="h-dvh overflow-hidden bg-(--app-bg) text-(--text)">
-      <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-dvh overflow-hidden bg-(--app-bg) text-(--text)">
+      <ConversationSidebar activeConversationId={routeConversationId} />
+
+      <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-(--border) bg-(--panel) px-3 sm:px-5">
-          <div className="flex min-w-0 items-center gap-3">
+          <Link className="flex min-w-0 items-center gap-3" to="/">
             <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-(--accent) text-sm font-bold text-white">
               L
             </div>
@@ -150,7 +155,7 @@ export function WorkspaceRoute() {
                 app-builder / live project
               </p>
             </div>
-          </div>
+          </Link>
 
           {hasStartedBuildingApp ? (
             <div className="grid h-9 grid-cols-2 rounded-lg border border-(--border) bg-(--control) p-1 text-sm">
@@ -236,7 +241,7 @@ export function WorkspaceRoute() {
             />
           </div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

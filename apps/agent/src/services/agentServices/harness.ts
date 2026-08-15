@@ -14,6 +14,7 @@ import type {
 } from "@google/genai";
 import env from "../../env";
 import type { ResponseLifeCycle } from "../responseHandler";
+import type { ToolStatusPayload } from "@repo/shared";
 
 const sleep = (ms: number) => {
   return new Promise((res) => setTimeout(res, ms));
@@ -231,11 +232,15 @@ export class Harness {
           }
 
           try {
-            // streaming tool call summary back to user
-            this.responseHandler.send(
-              "text",
-              tool.summaryText(parseResult.data),
-            );
+            // Streaming tool call summary back to user. Tagged as
+            // "tool-status" (not a bare string) so it never merges with the
+            // LLM's own narrative "text" chunks in the frontend — see
+            // ToolStatusPayload in @repo/shared.
+            const toolStatus: ToolStatusPayload = {
+              kind: "tool-status",
+              text: tool.summaryText(parseResult.data),
+            };
+            this.responseHandler.send("text", toolStatus);
 
             const result = await tool.execute(
               parseResult.data as any,

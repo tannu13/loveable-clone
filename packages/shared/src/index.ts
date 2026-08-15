@@ -29,6 +29,23 @@ export type ProjectSnapshot = {
   previewUrl: string;
 };
 
+// A tool-call's one-line status announcement (e.g. "Reading file @ x"),
+// streamed live as a `type: "text"` frame alongside the LLM's own narrative
+// text chunks. It's tagged with `kind: "tool-status"` specifically so it's
+// never mistaken for LLM output: the frontend's frame-merging logic only
+// concatenates consecutive *string* "text" payloads into one bubble, so a
+// tagged object payload here both renders as its own distinct message and
+// stops the next real text chunk from merging onto whatever tool status
+// happened to stream last (see apps/frontend's messageStream.ts). This is
+// live-only, ephemeral status — unlike Message["type"], it's never written
+// to `message_history` (there's no Postgres enum value for it, deliberately;
+// see the WorkspaceFrameTypes comment below for the same reasoning).
+export const ToolStatusPayloadSchema = z.object({
+  kind: z.literal("tool-status"),
+  text: z.string().min(1),
+});
+export type ToolStatusPayload = z.infer<typeof ToolStatusPayloadSchema>;
+
 export const QnAQuestionSchema = z.object({
   question: z.string().min(1, "Question statement should not be empty"),
   inputType: z.literal("select"),

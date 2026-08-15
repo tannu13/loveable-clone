@@ -25,6 +25,14 @@ function canMergeIntoLastMessage(
   lastMessage: Message | undefined,
   frame: ChatStreamFrame,
 ): lastMessage is Message & { content: string } {
+  // The `typeof ... === "string"` checks are doing double duty: besides
+  // ruling out non-text frames, they're what keeps a tool's "tool-status"
+  // announcement (a tagged object payload — see ToolStatusPayload in
+  // @repo/shared) from merging with the LLM's own narrative text on either
+  // side, even though both arrive as type: "text" frames. A tool-status
+  // frame always creates its own message (its payload isn't a string), and
+  // the next real text chunk always starts a fresh bubble afterwards (the
+  // preceding message's content isn't a string either).
   return (
     frame.type === "text" &&
     typeof frame.payload === "string" &&

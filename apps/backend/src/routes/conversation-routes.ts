@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { validate } from "../middlewares/validate";
 import { authMiddleware } from "../middlewares/auth";
-import { ConversationSchema, ReadFileQuerySchema } from "../types/validations";
+import {
+  ConversationSchema,
+  ReadFileQuerySchema,
+  RenameConversationSchema,
+} from "../types/validations";
 import { type TControllers } from "../controllers/message-controller";
 import { QnAReplySchema } from "@repo/shared";
 
@@ -10,7 +14,14 @@ export const createRoutes = (controllers: TControllers) => {
 
   convoRouter.use("/api/conversation", authMiddleware);
 
+  convoRouter.get("/api/conversation", controllers.listConversations);
   convoRouter.get("/api/conversation/:id", controllers.getConversation);
+  convoRouter.patch(
+    "/api/conversation/:id",
+    validate("body", RenameConversationSchema),
+    controllers.renameConversation,
+  );
+  convoRouter.delete("/api/conversation/:id", controllers.deleteConversation);
 
   convoRouter.post(
     "/api/conversation/",

@@ -49,6 +49,18 @@ export class K8Service {
     });
   }
 
+  async teardownInfrastructure(conversationId: string) {
+    await withActiveSpan("k8s-cluster.teardown", async () => {
+      logger.info("Tearing down conversation cluster");
+      await Promise.all([
+        this.deleteWorkspacePVC(conversationId),
+        this.deleteConversationDeployment(conversationId),
+        this.deletePreviewService(conversationId),
+        this.deletePreviewIngress(conversationId),
+      ]);
+    });
+  }
+
   async ensureWorkspacePVC(conversationId: string) {
     const pvcName = this.getPvcName(conversationId);
 
@@ -77,6 +89,24 @@ export class K8Service {
       if (err instanceof ApiException && err.code === 409) {
         // PVC already exists, so we can safely continue!
         logger.error(`PVC resource for ${conversationId} already exists`);
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async deleteWorkspacePVC(conversationId: string) {
+    const pvcName = this.getPvcName(conversationId);
+
+    try {
+      await this.k8sApi.deleteNamespacedPersistentVolumeClaim({
+        name: pvcName,
+        namespace: env.K8S_NAMESPACE,
+      });
+    } catch (err: any) {
+      if (err instanceof ApiException && err.code === 404) {
+        // PVC already gone, nothing left to do.
+        logger.error(`PVC resource for ${conversationId} already deleted`);
         return;
       }
       throw err;
@@ -116,6 +146,23 @@ export class K8Service {
     } catch (err: any) {
       if (err instanceof ApiException && err.code === 409) {
         logger.error(`Service resource for ${conversationId} already exists`);
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async deletePreviewService(conversationId: string) {
+    const serviceName = this.getPreviewServiceName(conversationId);
+
+    try {
+      await this.k8sApi.deleteNamespacedService({
+        name: serviceName,
+        namespace: env.K8S_NAMESPACE,
+      });
+    } catch (err: any) {
+      if (err instanceof ApiException && err.code === 404) {
+        logger.error(`Service resource for ${conversationId} already deleted`);
         return;
       }
       throw err;
@@ -167,6 +214,23 @@ export class K8Service {
     } catch (err: any) {
       if (err instanceof ApiException && err.code === 409) {
         logger.error(`Ingress resource for ${conversationId} already exists`);
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async deletePreviewIngress(conversationId: string) {
+    const ingressName = this.getPreviewIngressName(conversationId);
+
+    try {
+      await this.networkingApi.deleteNamespacedIngress({
+        name: ingressName,
+        namespace: env.K8S_NAMESPACE,
+      });
+    } catch (err: any) {
+      if (err instanceof ApiException && err.code === 404) {
+        logger.error(`Ingress resource for ${conversationId} already deleted`);
         return;
       }
       throw err;
@@ -309,6 +373,23 @@ export class K8Service {
         return;
       }
 
+      throw err;
+    }
+  }
+
+  async deleteConversationDeployment(conversationId: string) {
+    const deploymentName = `conversation-${conversationId}`;
+
+    try {
+      await this.appsApi.deleteNamespacedDeployment({
+        name: deploymentName,
+        namespace: env.K8S_NAMESPACE,
+      });
+    } catch (err: any) {
+      if (err instanceof ApiException && err.code === 404) {
+        logger.error(`Deployment resource for ${conversationId} already deleted`);
+        return;
+      }
       throw err;
     }
   }

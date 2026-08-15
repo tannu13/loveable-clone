@@ -1,6 +1,9 @@
 import {
   assertConversationBelongsToUser,
+  deleteConversation,
   getConversation,
+  listConversationsForUser,
+  renameConversation,
   saveConversation,
   saveMessage,
 } from "../models/conversation-model";
@@ -26,6 +29,22 @@ export class ConversationService {
     this.k8Service = k8Service;
   }
 
+  async listConversations(userId: string) {
+    return await listConversationsForUser(userId);
+  }
+
+  async renameConversation(id: string, userId: string, title: string) {
+    return await renameConversation(id, userId, title);
+  }
+
+  async deleteConversation(id: string, userId: string) {
+    await deleteConversation(id, userId);
+    // Best-effort infra cleanup, same fire-and-forget convention as
+    // ensureInfrastructure in handleMessage — a k8s hiccup here shouldn't
+    // block the (already-succeeded) delete response.
+    this.k8Service.teardownInfrastructure(id);
+  }
+
   async getMessage(id: string, userId: string) {
     const conversation = await getConversation(id, userId);
 
@@ -35,6 +54,7 @@ export class ConversationService {
 
     return {
       ...conversation,
+      previewUrl: this.k8Service.getPreviewUrl(id),
       messageHistory: toWireMessages(conversation.messageHistory),
     };
   }

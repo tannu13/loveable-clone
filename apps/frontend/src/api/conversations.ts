@@ -13,6 +13,7 @@ export type ConversationDetailsResponse = {
   userId: string;
   title: string | null;
   hasStartedBuildingApp: boolean;
+  previewUrl: string;
   messageHistory: Array<{
     type: Message["type"];
     createdAt: string;
@@ -22,12 +23,70 @@ export type ConversationDetailsResponse = {
   }>;
 };
 
+export type ConversationSummary = {
+  id: string;
+  title: string | null;
+  hasStartedBuildingApp: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export class HttpError extends Error {
   constructor(
     message: string,
     readonly status: number,
   ) {
     super(message);
+  }
+}
+
+export async function fetchConversations(): Promise<ConversationSummary[]> {
+  const response = await apiFetch("/api/conversation");
+
+  if (!response.ok) {
+    throw new HttpError(
+      `Failed to load conversations: ${response.status}`,
+      response.status,
+    );
+  }
+
+  return (await response.json()) as ConversationSummary[];
+}
+
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<void> {
+  const response = await apiFetch(
+    `/api/conversation/${encodeURIComponent(conversationId)}`,
+    {
+      body: JSON.stringify({ title }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "PATCH",
+    },
+  );
+
+  if (!response.ok) {
+    throw new HttpError(
+      `Failed to rename conversation: ${response.status}`,
+      response.status,
+    );
+  }
+}
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const response = await apiFetch(
+    `/api/conversation/${encodeURIComponent(conversationId)}`,
+    { method: "DELETE" },
+  );
+
+  if (!response.ok) {
+    throw new HttpError(
+      `Failed to delete conversation: ${response.status}`,
+      response.status,
+    );
   }
 }
 
@@ -57,7 +116,7 @@ export async function fetchConversationDetails(
       role: message.role,
       type: message.type,
     })),
-    previewUrl: "",
+    previewUrl: payload.previewUrl,
     summary: payload.title ?? "Project conversation",
     updatedAt: new Date(payload.updatedAt).toISOString(),
   };

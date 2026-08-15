@@ -37,6 +37,24 @@ export type ConversationWithMessageHistory = Awaited<
   ReturnType<typeof getConversation>
 >;
 
+export const listConversationsForUser = async (userId: string) => {
+  try {
+    return await db.query.conversations.findMany({
+      where: ({ userId: conversationUserId }) => eq(conversationUserId, userId),
+      orderBy: ({ updatedAt }, { desc }) => [desc(updatedAt)],
+      columns: {
+        id: true,
+        title: true,
+        hasStartedBuildingApp: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  } catch {
+    throw new InternalServerError("Unable to fetch conversations");
+  }
+};
+
 export const saveConversation = async ({
   content,
   role,
@@ -101,6 +119,56 @@ export const saveMessage = async (
     }
 
     throw new InternalServerError();
+  }
+};
+
+export const renameConversation = async (
+  conversationId: string,
+  userId: string,
+  title: string,
+) => {
+  await assertConversationBelongsToUser(conversationId, userId);
+
+  try {
+    const [conversation] = await db
+      .update(conversations)
+      .set({ title })
+      .where(eq(conversations.id, conversationId))
+      .returning();
+
+    if (!conversation) {
+      throw new NotFoundError("Conversation not found");
+    }
+
+    return conversation;
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      throw err;
+    }
+
+    throw new InternalServerError("Unable to rename conversation");
+  }
+};
+
+export const deleteConversation = async (
+  conversationId: string,
+  userId: string,
+) => {
+  await assertConversationBelongsToUser(conversationId, userId);
+
+  try {
+    // message_history.conversation_id has no ON DELETE CASCADE, so the
+    // child rows have to go first or the FK constraint rejects the
+    // conversation delete. Wrapped in a transaction so a failure partway
+    // through doesn't leave the conversation orphaned-but-messageless.
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(messageHistory)
+        .where(eq(messageHistory.conversationId, conversationId));
+      await tx.delete(conversations).where(eq(conversations.id, conversationId));
+    });
+  } catch {
+    throw new InternalServerError("Unable to delete conversation");
   }
 };
 

@@ -2,12 +2,25 @@ import type { Request, Response } from "express";
 import type {
   TConversationSchema,
   TReadFileQuerySchema,
+  TRenameConversationSchema,
 } from "../types/validations";
 import type { ConversationService } from "../services/conversation-service";
 import type { TQnAReplySchema } from "@repo/shared";
 import { UnauthorizedError } from "../utils/custom-errors";
 
 export const createControllers = (service: ConversationService) => {
+  const listConversations = async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedError();
+    }
+
+    const data = await service.listConversations(userId);
+
+    return res.status(200).json(data);
+  };
+
   const getConversation = async (req: Request, res: Response) => {
     const { id } = req.params as { id: string };
     const userId = req.user?.id;
@@ -36,6 +49,37 @@ export const createControllers = (service: ConversationService) => {
     );
 
     return res.status(200).json({ conversationId, previewUrl });
+  };
+
+  const renameConversation = async (req: Request, res: Response) => {
+    const conversationId = req.params.id as string;
+    const { title } = req.body as TRenameConversationSchema;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedError();
+    }
+
+    const conversation = await service.renameConversation(
+      conversationId,
+      userId,
+      title,
+    );
+
+    return res.status(200).json(conversation);
+  };
+
+  const deleteConversation = async (req: Request, res: Response) => {
+    const conversationId = req.params.id as string;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedError();
+    }
+
+    await service.deleteConversation(conversationId, userId);
+
+    return res.status(204).send();
   };
 
   const qnaReply = async (req: Request, res: Response) => {
@@ -80,6 +124,15 @@ export const createControllers = (service: ConversationService) => {
     return res.status(202).json({ ok: true });
   };
 
-  return { converse, qnaReply, getConversation, listFiles, readFile };
+  return {
+    converse,
+    qnaReply,
+    getConversation,
+    listConversations,
+    renameConversation,
+    deleteConversation,
+    listFiles,
+    readFile,
+  };
 };
 export type TControllers = ReturnType<typeof createControllers>;

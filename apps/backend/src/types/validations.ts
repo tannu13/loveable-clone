@@ -27,3 +27,12 @@ export const ReadFileQuerySchema = z.object({
   path: z.string().min(1, "Path is mandatory"),
 });
 export type TReadFileQuerySchema = z.infer<typeof ReadFileQuerySchema>;
+
+export const RenameConversationSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is mandatory")
+    .max(255, "Title must be 255 characters or fewer"),
+});
+export type TRenameConversationSchema = z.infer<typeof RenameConversationSchema>;
