@@ -9,11 +9,15 @@ import {
 } from "../models/conversation-model";
 import type { RedisClientType } from "redis";
 import type { K8Service } from "./k8sService";
-import type { TRedisMessageSchema } from "@repo/shared";
+import {
+  getMessageToAgentQueueName,
+  type TRedisMessageSchema,
+} from "@repo/shared";
 import { setSpanAttributes, withActiveSpan } from "@repo/observability";
 import { logger } from "../logger";
 import { toWireMessages } from "./message-history-mapper";
 
+const IDLE_TIMEOUT = 120;
 export class ConversationService {
   private publisher: RedisClientType;
   private k8Service: K8Service;
@@ -97,7 +101,7 @@ export class ConversationService {
         message,
       };
       await this.publisher.lPush(
-        `convo-request-${conversationId}`,
+        getMessageToAgentQueueName(conversationId),
         JSON.stringify(messagePayload),
       );
     });
@@ -124,7 +128,7 @@ export class ConversationService {
       message: { correlationId, answers },
     };
     await this.publisher.lPush(
-      `convo-request-${conversationId}`,
+      getMessageToAgentQueueName(conversationId),
       JSON.stringify(answerPayload),
     );
   }
@@ -138,7 +142,7 @@ export class ConversationService {
       message: null,
     };
     await this.publisher.lPush(
-      `convo-request-${conversationId}`,
+      getMessageToAgentQueueName(conversationId),
       JSON.stringify(jobPayload),
     );
   }
@@ -156,8 +160,18 @@ export class ConversationService {
       message: { path },
     };
     await this.publisher.lPush(
-      `convo-request-${conversationId}`,
+      getMessageToAgentQueueName(conversationId),
       JSON.stringify(jobPayload),
     );
+  }
+
+  async recordHeartbeat(conversationId: string, userId: string) {
+    await assertConversationBelongsToUser(conversationId, userId);
+
+    const expiry = Date.now() + IDLE_TIMEOUT;
+    await this.publisher.zAdd("conversation:activity", {
+      value: conversationId,
+      score: expiry,
+    });
   }
 }

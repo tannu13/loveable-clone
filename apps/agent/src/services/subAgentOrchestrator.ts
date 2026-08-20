@@ -51,11 +51,8 @@ export class SubAgentOrchestrator {
       });
     }
 
-    this.resolver(response);
-
     // all agents are done by either completing or failing
-    // td:: notify the parent somehow so that it can continue. by maybe resolving the parent's promise (loopback)
-    // the parent would need the array of [agent id, task given (this can be maintained by the main agent itself), artifact path and status]
+    this.resolver(response);
   }
 
   addAgent({

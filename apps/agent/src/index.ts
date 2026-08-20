@@ -22,16 +22,16 @@ import { getMainRepoPath } from "./utils/helpers";
 const { subscriber, publisher } = await setupComms();
 const responseHandler = new UserResponseHandler(
   publisher,
-  s3Service.uploadToS3,
+  s3Service.uploadChatBackupToS3,
 );
 
 let pastHistory: Content[] = [];
-// const historyFromBackup = (await s3Service.loadBackupFromS3()) as {
-//   history: Content[];
-// } | null;
-// if (historyFromBackup) {
-//   pastHistory = historyFromBackup.history;
-// }
+const historyFromBackup = (await s3Service.loadBackupFromS3()) as {
+  history: Content[];
+} | null;
+if (historyFromBackup) {
+  pastHistory = historyFromBackup.history;
+}
 
 const toolRegistry = new ToolRegistry();
 toolRegistry
@@ -59,6 +59,7 @@ const harness = new Harness({
 });
 const worker = new WorkerService({
   subscriber,
+  publisher,
   harness,
   responseHandler,
   workspace: getMainRepoPath(),

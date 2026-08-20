@@ -7,7 +7,14 @@ export type ProjectFile = {
 // Job kinds accepted on the backend -> agent request queue (convo-request-*).
 // "list_files"/"read_file" are handled directly by the agent's WorkerService
 // without going through the LLM harness.
-const JobTypes = z.enum(["text", "qna", "plan", "list_files", "read_file"]);
+const JobTypes = z.enum([
+  "text",
+  "qna",
+  "plan",
+  "list_files",
+  "read_file",
+  "initiate_shutdown",
+]);
 export const RedisMessageSchema = z.object({
   conversationId: z.string().min(1),
   type: JobTypes,
@@ -191,4 +198,10 @@ export type WorkspaceErrorFramePayload = {
 // Everything that can actually arrive on the conversation websocket wire.
 export type ConversationStreamFrameType = Message["type"] | WorkspaceFrameType;
 
-export { getMainRepoPath } from "./helpers";
+export const LifeCycleWorkerCommsSchema = z.object({
+  type: z.enum(["shutdown_ready"]),
+  conversationId: z.uuid(),
+});
+export type TLifeCycleWorkerComms = z.infer<typeof LifeCycleWorkerCommsSchema>;
+
+export { getMainRepoPath, getMessageToAgentQueueName } from "./helpers";

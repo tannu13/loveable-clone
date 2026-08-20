@@ -34,8 +34,6 @@ const conversationService = new ConversationService({
   k8Service,
 });
 const controllers = createControllers(conversationService);
-const previewUrl = env.PROJECT_PREVIEW_URL;
-const messageHistory: Message[] = [];
 
 const corsOptions = {
   origin: env.FRONTEND_URL,

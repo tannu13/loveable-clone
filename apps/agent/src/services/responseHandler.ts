@@ -3,7 +3,7 @@ import type { RedisClientType } from "redis";
 import env from "../env";
 import type { Content } from "@google/genai";
 import { getCurrentFormattedDate } from "../utils/helpers";
-import type { TUploadToS3 } from "./s3Service";
+import type { TUploadChatBackupToS3 } from "./s3Service";
 import {
   cleanupWorktree,
   createDiffArtifact,
@@ -24,11 +24,14 @@ export interface ResponseLifeCycle {
 
 export class UserResponseHandler implements ResponseLifeCycle {
   private publisher: RedisClientType;
-  private uploadToS3: TUploadToS3;
+  private uploadChatBackupToS3: TUploadChatBackupToS3;
 
-  constructor(publisher: RedisClientType, uploadToS3: TUploadToS3) {
+  constructor(
+    publisher: RedisClientType,
+    uploadChatBackupToS3: TUploadChatBackupToS3,
+  ) {
     this.publisher = publisher;
-    this.uploadToS3 = uploadToS3;
+    this.uploadChatBackupToS3 = uploadChatBackupToS3;
   }
 
   async send(type: ConversationStreamFrameType, payload: unknown) {
@@ -58,7 +61,7 @@ export class UserResponseHandler implements ResponseLifeCycle {
   }
 
   private async backupHistory(history: Content[]) {
-    await this.uploadToS3(
+    await this.uploadChatBackupToS3(
       { history },
       `${getCurrentFormattedDate()}-chat-backup-${env.CONVERSATION_ID}`,
     );

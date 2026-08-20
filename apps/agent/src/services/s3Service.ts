@@ -8,9 +8,13 @@ import {
 import * as unzipper from "unzipper";
 import env from "../env";
 import { getMainRepoPath } from "../utils/helpers";
+import { PassThrough } from "node:stream";
+import { Upload } from "@aws-sdk/lib-storage";
+import * as tar from "tar";
 
 const isDev = env.NODE_ENV === "development";
-const BACKUP_FILE_NAME = `chat-backup-${env.CONVERSATION_ID}-latest.json`;
+const CHAT_BACKUP_FILE_NAME = `chat-backup-${env.CONVERSATION_ID}-latest.json`;
+const USER_APP_BACKUP_FILE_NAME = `user-app-backup-${env.CONVERSATION_ID}-latest.tar.gz`;
 class S3Service {
   private client: S3Client;
 
@@ -26,7 +30,11 @@ class S3Service {
     });
   }
 
-  uploadToS3 = async (payload: any, destinationFileName: string) => {
+  uploadToS3 = async (
+    bucketName: string,
+    payload: any,
+    destinationFileName: string,
+  ) => {
     try {
       const jsonString = JSON.stringify(
         payload,
@@ -40,22 +48,24 @@ class S3Service {
       );
 
       const uploadParams = {
-        Bucket: env.AWS_CHAT_BUCKET_NAME,
+        Bucket: bucketName,
         Key: destinationFileName,
         Body: jsonString,
         ContentType: "application/json",
       };
 
-      console.log(`uploading ${destinationFileName} to S3...`);
+      console.log(
+        `uploading ${destinationFileName} to S3 bucked: ${bucketName}...`,
+      );
 
       const command = new PutObjectCommand(uploadParams);
       const response = await this.client.send(command);
 
-      // this way reading wud be always abt the latest file
+      // this way reading wud be always abt the latest fi le
       const copyCommand = new CopyObjectCommand({
-        Bucket: env.AWS_CHAT_BUCKET_NAME,
-        CopySource: `${env.AWS_CHAT_BUCKET_NAME}/${destinationFileName}`,
-        Key: BACKUP_FILE_NAME,
+        Bucket: bucketName,
+        CopySource: `${bucketName}/${destinationFileName}`,
+        Key: CHAT_BACKUP_FILE_NAME,
       });
       await this.client.send(copyCommand);
 
@@ -66,10 +76,147 @@ class S3Service {
     }
   };
 
+  uploadChatBackupToS3 = async (payload: any, destinationFileName: string) => {
+    return this.uploadToS3(
+      env.AWS_CHAT_BUCKET_NAME,
+      payload,
+      destinationFileName,
+    );
+  };
+
+  async uploadWorkspaceToS3(
+    bucketName: string,
+    workspacePath: string,
+    destinationKey: string,
+  ) {
+    try {
+      console.log(`Creating tar.gz archive from ${workspacePath}...`);
+
+      const archiveStream = tar.c(
+        {
+          cwd: workspacePath,
+          gzip: true,
+          strict: true,
+          filter: (path) => {
+            return !this.shouldExclude(path);
+          },
+        },
+        ["."],
+      );
+
+      const passThrough = new PassThrough();
+      archiveStream.pipe(passThrough);
+
+      console.log(`Uploading ${destinationKey} to S3 bucket ${bucketName}...`);
+
+      const upload = new Upload({
+        client: this.client,
+
+        params: {
+          Bucket: bucketName,
+          Key: destinationKey,
+          Body: passThrough,
+          ContentType: "application/gzip",
+          ContentDisposition: `attachment; filename="${destinationKey.split("/").pop()}"`,
+        },
+        queueSize: 4,
+        partSize: 10 * 1024 * 1024,
+        leavePartsOnError: false,
+      });
+
+      upload.on("httpUploadProgress", (progress) => {
+        console.log(`Upload progress: ${progress.loaded ?? 0} bytes`);
+      });
+
+      const response = await upload.done();
+
+      console.log(`Successfully uploaded ${destinationKey}`);
+
+      return response;
+    } catch (error) {
+      console.error(`Failed to backup workspace ${workspacePath}:`, error);
+
+      throw error;
+    }
+  }
+
+  private async updateLatestAppBackup(bucketName: string, sourceKey: string) {
+    const parts = sourceKey.split("/");
+
+    // conversations/<conversationId>/backups/<timestamp>.tar.gz
+    const conversationId = parts[1];
+
+    const latestKey = `conversations/${conversationId}/latest.tar.gz`;
+
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: bucketName,
+        CopySource: `${bucketName}/${sourceKey}`,
+        Key: latestKey,
+      }),
+    );
+
+    console.log(`Updated ${latestKey}`);
+  }
+
+  private shouldExclude(path: string): boolean {
+    const normalized = path.replaceAll("\\", "/");
+
+    const excludedDirectories = [
+      "node_modules",
+      ".next",
+      "dist",
+      "build",
+      ".cache",
+      ".turbo",
+      ".vite",
+      ".parcel-cache",
+      "coverage",
+    ];
+
+    const excludedFiles = [
+      ".env",
+      ".env.local",
+      ".env.development",
+      ".env.production",
+    ];
+
+    // path might be:
+    // ./node_modules/foo
+    // node_modules/foo
+    // ./src/foo.ts
+    const parts = normalized.split("/");
+
+    if (parts.some((part) => excludedDirectories.includes(part))) {
+      return false;
+    }
+
+    const filename = parts.at(-1);
+
+    if (filename && excludedFiles.includes(filename)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  uploadAppBackupToS3 = async (destinationFileName: string) => {
+    await this.uploadWorkspaceToS3(
+      env.AWS_USER_APP_BUCKET_NAME,
+      getMainRepoPath(),
+      destinationFileName,
+    );
+
+    await this.updateLatestAppBackup(
+      env.AWS_USER_APP_BUCKET_NAME,
+      destinationFileName,
+    );
+  };
+
   async loadBackupFromS3() {
     const params = {
       Bucket: env.AWS_CHAT_BUCKET_NAME,
-      Key: BACKUP_FILE_NAME,
+      Key: CHAT_BACKUP_FILE_NAME,
     };
 
     try {
@@ -149,4 +296,4 @@ class S3Service {
 }
 
 export const s3Service = new S3Service();
-export type TUploadToS3 = S3Service["uploadToS3"];
+export type TUploadChatBackupToS3 = S3Service["uploadChatBackupToS3"];

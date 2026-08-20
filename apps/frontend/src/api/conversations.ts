@@ -90,6 +90,15 @@ export async function deleteConversation(conversationId: string): Promise<void> 
   }
 }
 
+export async function sendHeartbeat(conversationId: string): Promise<void> {
+  // Fire-and-forget by design: heartbeats are lightweight liveness pings and
+  // a dropped one just means the backend notices inactivity a bit sooner, so
+  // callers don't need to treat failures as errors.
+  await apiFetch(
+    `/api/conversation/${encodeURIComponent(conversationId)}/heartbeat`,
+  );
+}
+
 export async function fetchConversationDetails(
   conversationId: string,
 ): Promise<ConversationDetails> {

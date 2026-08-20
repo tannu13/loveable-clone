@@ -47,5 +47,7 @@ export const createRoutes = (controllers: TControllers) => {
     controllers.readFile,
   );
 
+  convoRouter.get("/api/conversation/:id/heartbeat", controllers.heartbeat);
+
   return { convoRouter };
 };

@@ -7,6 +7,7 @@ import { mergeMessageHistory } from "../features/chat/messageDedupe";
 import { ConversationSidebar } from "../features/conversations/ConversationSidebar";
 import { CodeWorkspace } from "../features/workspace/CodeWorkspace";
 import { PreviewWorkspace } from "../features/workspace/PreviewWorkspace";
+import { useConversationHeartbeat } from "../hooks/useConversationHeartbeat";
 import { useConversationStream } from "../hooks/useConversationStream";
 import { getStoredIdentity, type UserIdentity } from "../lib/identity";
 import { hasStoredSessionToken } from "../lib/session";
@@ -35,6 +36,7 @@ export function WorkspaceRoute() {
     queryFn: () => fetchConversationDetails(routeConversationId!),
   });
   const conversationStream = useConversationStream(routeConversationId);
+  useConversationHeartbeat(routeConversationId);
 
   useEffect(() => {
     if (

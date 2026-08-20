@@ -124,6 +124,18 @@ export const createControllers = (service: ConversationService) => {
     return res.status(202).json({ ok: true });
   };
 
+  const heartbeat = async (req: Request, res: Response) => {
+    const conversationId = req.params.id as string;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedError();
+    }
+
+    await service.recordHeartbeat(conversationId, userId);
+    return res.status(204).send();
+  };
+
   return {
     converse,
     qnaReply,
@@ -133,6 +145,7 @@ export const createControllers = (service: ConversationService) => {
     deleteConversation,
     listFiles,
     readFile,
+    heartbeat,
   };
 };
 export type TControllers = ReturnType<typeof createControllers>;

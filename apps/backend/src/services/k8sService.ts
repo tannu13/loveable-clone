@@ -319,6 +319,11 @@ export class K8Service {
                         value:
                           "s30-loveable-startertemplates-bucket-410940411202-ap-south-1-an",
                       },
+                      {
+                        name: "AWS_USER_APP_BUCKET_NAME",
+                        value:
+                          "s30-loveable-clone-user-app-backup-410940411202-ap-south-1-an",
+                      },
                       { name: "WORKSPACE_DIR", value: "/workspace" },
                       {
                         name: "DATABASE_URL",
@@ -387,7 +392,9 @@ export class K8Service {
       });
     } catch (err: any) {
       if (err instanceof ApiException && err.code === 404) {
-        logger.error(`Deployment resource for ${conversationId} already deleted`);
+        logger.error(
+          `Deployment resource for ${conversationId} already deleted`,
+        );
         return;
       }
       throw err;
