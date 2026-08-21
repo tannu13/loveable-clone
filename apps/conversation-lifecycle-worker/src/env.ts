@@ -2,6 +2,7 @@ import z from "zod";
 
 const EnvSchema = z.object({
   REDIS_URL: z.string().startsWith("redis://"),
+  K8S_NAMESPACE: z.string().default("loveable-clone"),
 });
 
 type Env = z.infer<typeof EnvSchema>;

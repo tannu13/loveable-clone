@@ -2,6 +2,8 @@ import { sleep } from "bun";
 import { LifecycleWorkerService } from "./services/lifecyle-worker-service";
 import { createConnection } from "./services/redis";
 import { LifeCycleWorkerCommsSchema } from "@repo/shared";
+import { K8sTeardownService } from "@repo/k8s";
+import env from "./env";
 
 export async function startLifecycleWorker(
   lifecycleWorkerService: LifecycleWorkerService,
@@ -53,6 +55,9 @@ export async function startLifecycleWorker(
 
 export async function listenShutdownReadyMessages() {
   const client = await createConnection();
+  const teardownService = new K8sTeardownService({
+    k8sNamespace: env.K8S_NAMESPACE,
+  });
   while (true) {
     const response = await client.brPop(`shutdown_ready_agent`, 0);
     if (!response) continue;
@@ -64,6 +69,7 @@ export async function listenShutdownReadyMessages() {
     }
 
     if (parsed.data.type === "shutdown_ready") {
+      teardownService.teardownInfrastructure(parsed.data.conversationId);
     }
   }
 }

@@ -13,15 +13,28 @@ import { createSessionRoutes } from "./routes/session-routes";
 import { createUserRoutes } from "./routes/user-routes";
 import { createControllers } from "./controllers/message-controller";
 import { ConversationService } from "./services/conversation-service";
-import { K8Service } from "./services/k8sService";
 import { addHttpMetrics } from "./middlewares/http-metrics";
 import { logger } from "./logger";
 import { withActiveSpan } from "@repo/observability";
+import { K8Service, type K8sServiceConfig } from "@repo/k8s";
 
 const redisClient = await setupComms();
 let k8Service: K8Service;
 try {
-  k8Service = new K8Service();
+  const k8sConfig: K8sServiceConfig = {
+    projectPreviewProtocol: env.PROJECT_PREVIEW_PROTOCOL,
+    projectPreviewBaseDomain: env.PROJECT_PREVIEW_BASE_DOMAIN,
+    k8sNamespace: env.K8S_NAMESPACE,
+    previewAppPort: env.PREVIEW_APP_PORT,
+    k8sIngressClassName: env.K8S_INGRESS_CLASS_NAME,
+    agentDockerImagePath: env.AGENT_DOCKER_IMAGE_PATH,
+    nodeEnv: env.NODE_ENV,
+    clusterRedisAccessUrl: env.CLUSTER_REDIS_ACCESS_URL,
+    geminiApiKey: env.GEMINI_API_KEY,
+    appRunnerDockerImagePath: env.APP_RUNNER_DOCKER_IMAGE_PATH,
+    appRunnerPort: env.APP_RUNNER_PORT,
+  };
+  k8Service = new K8Service(k8sConfig, logger);
 } catch (error) {
   logger.error(
     "Failed to initialize Kubernetes client. Check that minikube is running and kubectl has an active context.",

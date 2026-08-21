@@ -8,7 +8,7 @@ import {
   saveMessage,
 } from "../models/conversation-model";
 import type { RedisClientType } from "redis";
-import type { K8Service } from "./k8sService";
+import type { K8Service } from "@repo/k8s";
 import {
   getMessageToAgentQueueName,
   type TRedisMessageSchema,
