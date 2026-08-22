@@ -25,6 +25,7 @@ export class WorkerService {
   private responseHandler: ResponseLifeCycle;
   private workspace: string;
   private isListeningForMessages = true;
+  private harnessChain = Promise.resolve();
 
   constructor({
     subscriber,
@@ -48,10 +49,18 @@ export class WorkerService {
 
   async listenForJobs() {
     while (this.isListeningForMessages) {
-      const response = await this.subscriber.brPop(
-        getMessageToAgentQueueName(env.CONVERSATION_ID),
-        0,
-      );
+      let response;
+      try {
+        response = await this.subscriber.brPop(
+          getMessageToAgentQueueName(env.CONVERSATION_ID),
+          0,
+        );
+      } catch (err) {
+        if (!this.isListeningForMessages) break;
+        console.error("Job queue read failed", err);
+        continue;
+      }
+
       if (!response) continue;
 
       try {
@@ -62,27 +71,52 @@ export class WorkerService {
           continue;
         }
 
-        await this.handleJob(parsed.data);
+        this.dispatch(parsed.data);
       } catch (err) {
         console.error("Failed to parse payload", err);
       }
     }
   }
 
-  async handleJob(jobData: TRedisMessageSchema) {
-    if (jobData.type === "text" && typeof jobData.message === "string") {
-      this.harness.addUserPrompt(jobData.message);
-      await this.harness.executeTask();
-    } else if (jobData.type === "qna") {
-      const result = QnAReplySchema.safeParse(jobData.message);
+  private dispatch(job: TRedisMessageSchema) {
+    if (
+      job.type === "list_files" ||
+      job.type === "read_file" ||
+      job.type === "qna"
+    ) {
+      this.handleImmediateJob(job).catch((err: unknown) => {
+        console.error("Immediate job failed", err);
+      });
+      return;
+    }
+
+    // anything that drives the harness or snapshots the workspace runs one at a time
+    this.harnessChain = this.harnessChain
+      .then(() => this.handleHarnessJob(job))
+      .catch((err: unknown) => {
+        console.error("Harness job failed", err);
+      });
+  }
+
+  // jobs that must not queue behind the harness.
+  private async handleImmediateJob(job: TRedisMessageSchema) {
+    if (job.type === "list_files") {
+      await this.handleListFiles();
+    } else if (job.type === "read_file") {
+      await this.handleReadFile(job.message);
+    } else if (job.type === "qna") {
+      const result = QnAReplySchema.safeParse(job.message);
       if (result.success) {
         resolveResponse(result.data.correlationId, result.data.answers);
       }
-    } else if (jobData.type === "list_files") {
-      await this.handleListFiles();
-    } else if (jobData.type === "read_file") {
-      await this.handleReadFile(jobData.message);
-    } else if (jobData.type === "initiate_shutdown") {
+    }
+  }
+
+  private async handleHarnessJob(job: TRedisMessageSchema) {
+    if (job.type === "text" && typeof job.message === "string") {
+      this.harness.addUserPrompt(job.message);
+      await this.harness.executeTask();
+    } else if (job.type === "initiate_shutdown") {
       await this.handleShutdownInitiation();
     }
   }
