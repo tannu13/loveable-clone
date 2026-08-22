@@ -98,7 +98,7 @@ class S3Service {
           gzip: true,
           strict: true,
           filter: (path) => {
-            return !this.shouldExclude(path);
+            return this.shouldInclude(path);
           },
         },
         ["."],
@@ -159,7 +159,7 @@ class S3Service {
     console.log(`Updated ${latestKey}`);
   }
 
-  private shouldExclude(path: string): boolean {
+  private shouldInclude(path: string): boolean {
     const normalized = path.replaceAll("\\", "/");
 
     const excludedDirectories = [

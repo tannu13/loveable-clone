@@ -3,6 +3,7 @@ import {
   type TRedisMessageSchema,
 } from "@repo/shared";
 import type { RedisClientType } from "redis";
+import { getConversationHeartbeatName } from "../../../../packages/shared/src/helpers";
 
 export class LifecycleWorkerService {
   private redis: RedisClientType;
@@ -14,7 +15,7 @@ export class LifecycleWorkerService {
   async findIdleConversationIds() {
     const now = Date.now();
     const conversationIds = await this.redis.zRangeByScore(
-      "conversation:activity",
+      getConversationHeartbeatName(),
       "-inf",
       now,
     );
@@ -29,10 +30,14 @@ export class LifecycleWorkerService {
     if (exists === 1) {
       return false;
     }
-    const res = await this.redis.set("lifecycle:reaper-lock", conversationId, {
-      condition: "NX",
-      expiration: { type: "EX", value: 30 },
-    });
+    const res = await this.redis.set(
+      `lifecycle:reaper-lock:${conversationId}`,
+      1,
+      {
+        condition: "NX",
+        expiration: { type: "EX", value: 30 },
+      },
+    );
 
     return res === "OK";
   }
@@ -49,10 +54,6 @@ export class LifecycleWorkerService {
     // pick it up. the shutdown lock is to make the process idempotent, i.e. if the next
     // leader after the first one expires, does pick up the same conversaion, they'd not
     // be able to initiate the shutdown because of the longer lock on the conversation itself.
-    await this.redis.set(`shutdown:${conversationId}`, 1, {
-      condition: "NX",
-      expiration: { type: "EX", value: 300 },
-    });
 
     const messagePayload: TRedisMessageSchema = {
       conversationId,
@@ -63,5 +64,10 @@ export class LifecycleWorkerService {
       getMessageToAgentQueueName(conversationId),
       JSON.stringify(messagePayload),
     );
+
+    await this.redis.set(`shutdown:${conversationId}`, 1, {
+      condition: "NX",
+      expiration: { type: "EX", value: 300 },
+    });
   }
 }

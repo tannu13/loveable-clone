@@ -1,9 +1,13 @@
 import { sleep } from "bun";
 import { LifecycleWorkerService } from "./services/lifecyle-worker-service";
-import { createConnection } from "./services/redis";
-import { LifeCycleWorkerCommsSchema } from "@repo/shared";
+import { createConnection, redis } from "./services/redis";
+import {
+  getLifecycleWorkerQueueName,
+  LifeCycleWorkerCommsSchema,
+} from "@repo/shared";
 import { K8sTeardownService } from "@repo/k8s";
 import env from "./env";
+import { getConversationHeartbeatName } from "../../../packages/shared/src/helpers";
 
 export async function startLifecycleWorker(
   lifecycleWorkerService: LifecycleWorkerService,
@@ -13,16 +17,14 @@ export async function startLifecycleWorker(
       const conversationIds =
         await lifecycleWorkerService.findIdleConversationIds();
 
-      if (conversationIds.length === 0) return;
-
       // scale down the conversation ids based infra
-      conversationIds.forEach(async (id) => {
+      for (const id of conversationIds) {
         // doing a leader election via lock in case this process becomes the bottleneck
         // and is horizontally scaled
         const lockAcquired =
           await lifecycleWorkerService.tryAcquireReaperLock(id);
 
-        if (!lockAcquired) return;
+        if (!lockAcquired) continue;
 
         // across multiple instances, this instance won the leader election.
         // so it gets the task of scaling down the infra for this conversaion id
@@ -44,7 +46,7 @@ export async function startLifecycleWorker(
          */
 
         await lifecycleWorkerService.sendShutdownMessageToAgent(id);
-      });
+      }
     } catch (error) {
       console.error(error);
     }
@@ -59,17 +61,31 @@ export async function listenShutdownReadyMessages() {
     k8sNamespace: env.K8S_NAMESPACE,
   });
   while (true) {
-    const response = await client.brPop(`shutdown_ready_agent`, 0);
+    const response = await client.brPop(getLifecycleWorkerQueueName(), 0);
     if (!response) continue;
 
-    const parsed = LifeCycleWorkerCommsSchema.safeParse(response);
-    if (!parsed.success) {
-      // skip
-      continue;
-    }
+    try {
+      const parsedElement = JSON.parse(response.element);
+      const parsed = LifeCycleWorkerCommsSchema.safeParse(parsedElement);
+      if (!parsed.success) {
+        // skip
+        continue;
+      }
 
-    if (parsed.data.type === "shutdown_ready") {
-      teardownService.teardownInfrastructure(parsed.data.conversationId);
+      if (parsed.data.type === "shutdown_ready") {
+        await teardownService.teardownInfrastructure(
+          parsed.data.conversationId,
+        );
+
+        // delete from the sorted set so it isn't picked up again later
+        const sharedConn = await redis();
+        await sharedConn.zRem(
+          getConversationHeartbeatName(),
+          parsed.data.conversationId,
+        );
+      }
+    } catch (err) {
+      console.error("Failed to parse payload", err);
     }
   }
 }

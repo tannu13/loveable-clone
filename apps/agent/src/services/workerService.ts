@@ -1,4 +1,5 @@
 import {
+  getLifecycleWorkerQueueName,
   getMessageToAgentQueueName,
   QnAReplySchema,
   ReadFileRequestSchema,
@@ -61,7 +62,7 @@ export class WorkerService {
           continue;
         }
 
-        this.handleJob(parsed.data);
+        await this.handleJob(parsed.data);
       } catch (err) {
         console.error("Failed to parse payload", err);
       }
@@ -118,27 +119,34 @@ export class WorkerService {
   }
 
   private async handleShutdownInitiation() {
-    // td:: the draining phase should be done as the last step because the agent might fail at backing up the user app to s3
-    // stop listening in for other messages - draining
-    this.isListeningForMessages = false;
-    this.subscriber.destroy();
+    try {
+      // push backup to an object store - use S3Service
+      const timestamp = Date.now();
+      const fileName = `conversations/${env.CONVERSATION_ID}/backups/${timestamp}.tar.gz`;
+      await s3Service.uploadAppBackupToS3(fileName);
 
-    // push backup to an object store - use S3Service
-    const timestamp = Date.now();
-    const fileName = `conversations/${env.CONVERSATION_ID}/backups/${timestamp}.tar.gz`;
-    await s3Service.uploadAppBackupToS3(fileName);
+      // td::record backup information somewhere
 
-    // td::record backup information somewhere
+      // send to lifecycle service via queue - ready for shutdown
+      const message: TLifeCycleWorkerComms = {
+        type: "shutdown_ready",
+        conversationId: env.CONVERSATION_ID,
+      };
+      await this.publisher.lPush(
+        getLifecycleWorkerQueueName(),
+        JSON.stringify(message),
+      );
 
-    // send to lifecycle service via queue - ready for shutdown
-    const message: TLifeCycleWorkerComms = {
-      type: "shutdown_ready",
-      conversationId: env.CONVERSATION_ID,
-    };
-    this.publisher.lPush(`convo-lifecycle-worker`, JSON.stringify(message));
+      // the draining phase should be done as the last step because the agent might fail at backing up the user app to s3
+      // stop listening in for other messages - draining
+      this.isListeningForMessages = false;
+      this.subscriber.destroy();
 
-    // park the process via an awaited promise
-    await this.parkProcess();
+      // park the process via an awaited promise
+      await this.parkProcess();
+    } catch (err) {
+      console.error("Shutdown Failed...", err);
+    }
   }
 
   private async parkProcess() {

@@ -204,4 +204,8 @@ export const LifeCycleWorkerCommsSchema = z.object({
 });
 export type TLifeCycleWorkerComms = z.infer<typeof LifeCycleWorkerCommsSchema>;
 
-export { getMainRepoPath, getMessageToAgentQueueName } from "./helpers";
+export {
+  getMainRepoPath,
+  getMessageToAgentQueueName,
+  getLifecycleWorkerQueueName,
+} from "./helpers";

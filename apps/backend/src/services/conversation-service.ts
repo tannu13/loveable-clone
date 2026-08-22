@@ -16,8 +16,9 @@ import {
 import { setSpanAttributes, withActiveSpan } from "@repo/observability";
 import { logger } from "../logger";
 import { toWireMessages } from "./message-history-mapper";
+import { getConversationHeartbeatName } from "../../../../packages/shared/src/helpers";
 
-const IDLE_TIMEOUT = 120;
+const IDLE_TIMEOUT_MS = 120_000;
 export class ConversationService {
   private publisher: RedisClientType;
   private k8Service: K8Service;
@@ -47,6 +48,7 @@ export class ConversationService {
     // ensureInfrastructure in handleMessage — a k8s hiccup here shouldn't
     // block the (already-succeeded) delete response.
     this.k8Service.teardownInfrastructure(id);
+    this.publisher.zRem(getConversationHeartbeatName(), id);
   }
 
   async getMessage(id: string, userId: string) {
@@ -87,6 +89,8 @@ export class ConversationService {
         ? await saveMessage(conversationId, userId, payload)
         : await saveConversation({ ...payload, userId });
     });
+
+    this.recordHeartbeat(conversationId, userId);
 
     setSpanAttributes({
       "conversation.id": conversationId,
@@ -168,8 +172,8 @@ export class ConversationService {
   async recordHeartbeat(conversationId: string, userId: string) {
     await assertConversationBelongsToUser(conversationId, userId);
 
-    const expiry = Date.now() + IDLE_TIMEOUT;
-    await this.publisher.zAdd("conversation:activity", {
+    const expiry = Date.now() + IDLE_TIMEOUT_MS;
+    await this.publisher.zAdd(getConversationHeartbeatName(), {
       value: conversationId,
       score: expiry,
     });
