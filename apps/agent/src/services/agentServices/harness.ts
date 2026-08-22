@@ -4,7 +4,7 @@ import {
   ValidateToolCallHook,
   type PreToolCallContext,
 } from "./hooks";
-import { ToolRegistry } from "./tools";
+import type { ToolRegistry } from "./tools";
 import { ContextManager } from "./contextManager";
 import type {
   Content,
@@ -67,16 +67,19 @@ export class Harness {
   }
 
   async handleErrorGracefully(
-    stepRunner: Promise<AsyncGenerator<GenerateContentResponse, any, any>>,
+    stepRunner: Promise<
+      AsyncGenerator<GenerateContentResponse, unknown, unknown>
+    >,
     retries = 3,
     delay = 1000,
   ) {
     for (let i = 0; i < retries; i++) {
       try {
         return await stepRunner;
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Check for 500 or 503 internal/service unavailable errors
-        if (error.status === 500 && i < retries - 1) {
+        const err = error as { status?: number };
+        if (err.status === 500 && i < retries - 1) {
           console.warn(
             `Internal server error. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`,
           );
@@ -147,12 +150,12 @@ export class Harness {
       let finalUsage: GenerateContentResponse["usageMetadata"] | undefined;
       let accumulatedText = "";
       const pendingFunctionCalls: FunctionCall[] = [];
-      let modelPartsFromStream: Part[] = [];
+      const modelPartsFromStream: Part[] = [];
 
       for await (const chunk of responseStream) {
         if (chunk.text) {
           accumulatedText += chunk.text;
-          this.responseHandler.send("text", chunk.text);
+          void this.responseHandler.send("text", chunk.text);
         }
 
         // Collect candidate parts emitted during streaming
@@ -240,9 +243,10 @@ export class Harness {
               kind: "tool-status",
               text: tool.summaryText(parseResult.data),
             };
-            this.responseHandler.send("text", toolStatus);
+            void this.responseHandler.send("text", toolStatus);
 
             const result = await tool.execute(
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-explicit-any -- The data is parsed above via zod schema parsing
               parseResult.data as any,
               this.workspace,
               this.responseHandler,
@@ -268,7 +272,7 @@ export class Harness {
         console.dir(this.agent.getHistory(), { depth: 10 });
         processing = false;
 
-        this.responseHandler.end({
+        void this.responseHandler.end({
           history: this.agent.getHistory(),
           db: {
             type: "text",

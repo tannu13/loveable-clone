@@ -18,11 +18,9 @@ export async function listProjectFiles(
   projectRoot: string,
 ): Promise<ProjectFile[]> {
   const paths = await walkProject(projectRoot);
-  const files = await Promise.all(
-    paths.map(async (filePath) => ({
-      path: toProjectPath(projectRoot, filePath),
-    })),
-  );
+  const files = paths.map((filePath) => ({
+    path: toProjectPath(projectRoot, filePath),
+  }));
 
   return files.sort((left, right) => left.path.localeCompare(right.path));
 }
@@ -74,7 +72,7 @@ export async function readProjectFile(
   projectRoot: string,
   filePath: string,
 ): Promise<string> {
-  return await readFile(resolveProjectPath(projectRoot, filePath), "utf8");
+  return readFile(resolveProjectPath(projectRoot, filePath), "utf8");
 }
 
 export async function writeProjectFile(

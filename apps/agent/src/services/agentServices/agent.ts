@@ -42,7 +42,7 @@ export class Agent {
 
   async runStep(contents: Content[] = this.history, registry?: ToolRegistry) {
     const declarations = registry?.getGiminiDeclarations() || [];
-    return await this.ai.models.generateContentStream({
+    return this.ai.models.generateContentStream({
       model: this.model,
       contents,
       config: {
@@ -63,7 +63,7 @@ export class Agent {
     registry: ToolRegistry,
   ) {
     const declarations = registry.getGiminiDeclarations();
-    return await this.ai.models.countTokens({
+    return this.ai.models.countTokens({
       model: this.model,
       contents,
       config: {

@@ -22,6 +22,6 @@ async function bootstrap() {
     });
 }
 
-bootstrap().catch((err) => {
+bootstrap().catch((err: unknown) => {
   console.error("Failed to start application:", err);
 });

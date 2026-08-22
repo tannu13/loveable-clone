@@ -14,7 +14,6 @@ import * as tar from "tar";
 
 const isDev = env.NODE_ENV === "development";
 const CHAT_BACKUP_FILE_NAME = `chat-backup-${env.CONVERSATION_ID}-latest.json`;
-const USER_APP_BACKUP_FILE_NAME = `user-app-backup-${env.CONVERSATION_ID}-latest.tar.gz`;
 class S3Service {
   private client: S3Client;
 
@@ -32,7 +31,7 @@ class S3Service {
 
   uploadToS3 = async (
     bucketName: string,
-    payload: any,
+    payload: unknown,
     destinationFileName: string,
   ) => {
     try {
@@ -76,7 +75,10 @@ class S3Service {
     }
   };
 
-  uploadChatBackupToS3 = async (payload: any, destinationFileName: string) => {
+  uploadChatBackupToS3 = async (
+    payload: unknown,
+    destinationFileName: string,
+  ) => {
     return this.uploadToS3(
       env.AWS_CHAT_BUCKET_NAME,
       payload,
@@ -238,13 +240,14 @@ class S3Service {
 
       console.log("store backup found and loaded.");
       return backup;
-    } catch (error: any) {
-      if (error?.name && error?.name === "NotFound") {
+    } catch (error: unknown) {
+      const err = error as { name?: string };
+      if (err?.name && err?.name === "NotFound") {
         console.log("No backup file found");
         return null;
       }
 
-      console.error("error retrieving backup:", error);
+      console.error("error retrieving backup:", err);
       throw error;
     }
   }
@@ -280,11 +283,12 @@ class S3Service {
         `Starter template files successfully downloaded and extracted to: ${outputDirectory}`,
       );
       return outputDirectory;
-    } catch (error: any) {
-      if (
-        error?.name === "NotFound" ||
-        error?.$metadata?.httpStatusCode === 404
-      ) {
+    } catch (error: unknown) {
+      const err = error as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
+      if (err?.name === "NotFound" || err?.$metadata?.httpStatusCode === 404) {
         console.log("No starter template found");
         return null;
       }

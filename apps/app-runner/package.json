@@ -4,16 +4,19 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/express": "^5.0.6"
+    "@types/express": "^5.0.6",
+    "eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@repo/eslint-config": "workspace:*",
     "@repo/shared": "workspace:*",
     "express": "^5.2.1",
     "zod": "^4.4.3"

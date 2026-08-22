@@ -208,4 +208,5 @@ export {
   getMainRepoPath,
   getMessageToAgentQueueName,
   getLifecycleWorkerQueueName,
+  getConversationHeartbeatName,
 } from "./helpers";

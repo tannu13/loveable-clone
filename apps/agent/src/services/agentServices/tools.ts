@@ -264,7 +264,7 @@ export const gitCommitTool: AgentTool<typeof GitCommitSchema> = {
       await commitWorkspace(workspace, args.commitMessage);
       return { status: "Workspace state committed" };
     } catch (err: unknown) {
-      let errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       return { status: errorMessage };
     }
   },
@@ -329,8 +329,11 @@ export const qnaTool: AgentTool<typeof QnASchema> = {
       questions: args.questions,
     };
 
-    responseHandler.send("qna", payload);
-    await responseHandler.saveToDB({ type: "qna", ...qnaAskCodec.toRow(payload) });
+    void responseHandler.send("qna", payload);
+    await responseHandler.saveToDB({
+      type: "qna",
+      ...qnaAskCodec.toRow(payload),
+    });
 
     const userAnswer = await waitForResponse(payload.correlationId);
     await responseHandler.saveToDB({
@@ -410,8 +413,11 @@ export const updatePlanTool: AgentTool<typeof UpdatePlanSchema> = {
       plan: args.plan,
     };
 
-    responseHandler.send("plan", payload);
-    await responseHandler.saveToDB({ type: "plan", ...planAskCodec.toRow(payload) });
+    void responseHandler.send("plan", payload);
+    await responseHandler.saveToDB({
+      type: "plan",
+      ...planAskCodec.toRow(payload),
+    });
 
     return { message: "Plan updates sent to user" };
   },

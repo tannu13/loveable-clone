@@ -65,4 +65,4 @@ const worker = new WorkerService({
   workspace: getMainRepoPath(),
 });
 
-worker.listenForJobs();
+void worker.listenForJobs();

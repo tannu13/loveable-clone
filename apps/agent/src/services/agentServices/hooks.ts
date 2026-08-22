@@ -34,7 +34,7 @@ export interface Hook<T extends HookType> {
 }
 
 export class HooksRegistry {
-  private hooks = new Map<HookType, Hook<any>[]>();
+  private hooks = new Map<HookType, Hook<HookType>[]>();
 
   register<T extends HookType>(type: T, hook: Hook<T>) {
     if (!this.hooks.has(type)) {
@@ -46,7 +46,7 @@ export class HooksRegistry {
 
   async executeHooks<T extends HookType>(type: T, context: HookContextMap[T]) {
     const hooksForType = this.hooks.get(type);
-    if (!hooksForType || hooksForType.length == 0) return;
+    if (!hooksForType || hooksForType.length === 0) return;
 
     for (const hook of hooksForType) {
       await hook.process(context);

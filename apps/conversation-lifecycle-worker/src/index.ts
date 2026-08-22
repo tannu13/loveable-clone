@@ -8,6 +8,12 @@ import { redis } from "./services/redis";
 const redisClient = await redis();
 const lifecycleWorkerService = new LifecycleWorkerService(redisClient);
 // start worker which periodically checks for conversations that have gone stale
-startLifecycleWorker(lifecycleWorkerService);
+startLifecycleWorker(lifecycleWorkerService).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});
 // consume the agents' shutdown-ready signals and tear their infra down
-listenShutdownReadyMessages();
+listenShutdownReadyMessages().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,9 +1,9 @@
 import {
+  getConversationHeartbeatName,
   getMessageToAgentQueueName,
   type TRedisMessageSchema,
 } from "@repo/shared";
 import type { RedisClientType } from "redis";
-import { getConversationHeartbeatName } from "../../../../packages/shared/src/helpers";
 
 export class LifecycleWorkerService {
   private redis: RedisClientType;

@@ -35,14 +35,14 @@ export class UserResponseHandler implements ResponseLifeCycle {
   }
 
   async send(type: ConversationStreamFrameType, payload: unknown) {
-    this.publisher.publish(
+    await this.publisher.publish(
       `convo-response`,
       JSON.stringify({ conversationId: env.CONVERSATION_ID, type, payload }),
     );
   }
 
   async end(data: { history: Content[]; db?: TDB }) {
-    this.publisher.publish(
+    await this.publisher.publish(
       `convo-response`,
       JSON.stringify({
         conversationId: env.CONVERSATION_ID,
@@ -52,11 +52,11 @@ export class UserResponseHandler implements ResponseLifeCycle {
     );
 
     if (data.history.length > 0) {
-      this.backupHistory(data.history);
+      void this.backupHistory(data.history);
     }
 
     if (data.db) {
-      this.saveToDB(data.db);
+      void this.saveToDB(data.db);
     }
   }
 
@@ -104,11 +104,10 @@ export class SubAgentResponseHandler implements ResponseLifeCycle {
     this.mainRepoPath = mainRepoPath;
     this.branchName = branchName;
   }
-  async saveToDB(data: TDB) {
+  async saveToDB() {
     // tbd
-    return;
   }
-  async send(type: ConversationStreamFrameType, payload: unknown) {
+  async send() {
     // tbd
   }
 

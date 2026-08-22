@@ -81,7 +81,7 @@ export class SubAgentOrchestrator {
     task.artifactPath = artifactPath;
     task.logs = logs;
 
-    this.areAllDone();
+    void this.areAllDone();
   }
 
   taskFailed(agentId: string, artifactPath: string, logs: string) {
@@ -92,7 +92,7 @@ export class SubAgentOrchestrator {
     task.artifactPath = artifactPath;
     task.logs = logs;
 
-    this.areAllDone();
+    void this.areAllDone();
   }
 
   async spawnAgents() {

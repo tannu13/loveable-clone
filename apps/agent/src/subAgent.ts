@@ -1,4 +1,3 @@
-import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { Harness } from "./services/agentServices/harness";
 import {
@@ -64,4 +63,4 @@ const harness = new Harness({
 });
 
 harness.addUserPrompt(taskDescription);
-harness.executeTask();
+void harness.executeTask();

@@ -103,12 +103,12 @@ function runCommand(
     let stdout = "";
     let stderr = "";
 
-    streamOutput(child.stdout as ReadableStream<Uint8Array>, (text) => {
+    void streamOutput(child.stdout, (text) => {
       stdout += text;
       appendLog(source, "stdout", text);
     });
 
-    streamOutput(child.stderr as ReadableStream<Uint8Array>, (text) => {
+    void streamOutput(child.stderr, (text) => {
       stderr += text;
       appendLog(source, "stderr", text);
     });

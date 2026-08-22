@@ -5,7 +5,6 @@ import express, {
 } from "express";
 import cors from "cors";
 import env from "./env";
-import type { Message } from "@repo/shared";
 import { AppError } from "./utils/custom-errors";
 import { setupComms } from "./services/redis";
 import { createRoutes } from "./routes/conversation-routes";
@@ -81,8 +80,8 @@ app.get("/health", (_req: Request, res: Response) => {
 //   response.status(200).json(ps);
 // });
 
-app.get("/test-logs", (req, res) => {
-  withActiveSpan("otel-context-added-test", async () => {
+app.get("/test-logs", async (req, res) => {
+  await withActiveSpan("otel-context-added-test", () => {
     logger.info({ test: "otel-logsddd" }, "Testing OpenTelemetry logs");
   });
 

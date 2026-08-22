@@ -4,12 +4,14 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bunx tsx watch src/index.ts"
+    "dev": "bunx tsx watch src/index.ts",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6"
+    "@types/express": "^5.0.6",
+    "eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -24,6 +26,7 @@
     "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@repo/db": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@repo/k8s": "workspace:*",
     "@repo/observability": "workspace:*",
     "@repo/shared": "workspace:*",

@@ -7,7 +7,7 @@ type SpanOptions = {
 
 export function withActiveSpan<T>(
   name: string,
-  fn: () => Promise<T>,
+  fn: () => Promise<T> | T,
   options?: SpanOptions,
 ) {
   return getTracer().startActiveSpan(name, async (span) => {

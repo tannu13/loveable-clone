@@ -1,13 +1,13 @@
 import { sleep } from "bun";
-import { LifecycleWorkerService } from "./services/lifecyle-worker-service";
+import type { LifecycleWorkerService } from "./services/lifecyle-worker-service";
 import { createConnection, redis } from "./services/redis";
 import {
+  getConversationHeartbeatName,
   getLifecycleWorkerQueueName,
   LifeCycleWorkerCommsSchema,
 } from "@repo/shared";
 import { K8sTeardownService } from "@repo/k8s";
 import env from "./env";
-import { getConversationHeartbeatName } from "../../../packages/shared/src/helpers";
 
 export async function startLifecycleWorker(
   lifecycleWorkerService: LifecycleWorkerService,

@@ -4,12 +4,14 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",
     "@types/bun": "latest",
-    "@types/unzipper": "^0.10.11"
+    "@types/unzipper": "^0.10.11",
+    "eslint": "^9.39.1"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -19,6 +21,7 @@
     "@aws-sdk/lib-storage": "^3.1111.0",
     "@google/genai": "^2.11.0",
     "@repo/db": "workspace:*",
+    "@repo/eslint-config": "workspace:*",
     "@repo/shared": "workspace:*",
     "archiver": "^8.0.0",
     "redis": "^6.1.0",

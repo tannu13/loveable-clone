@@ -1,3 +1,22 @@
 {
-  "yaml.validate": false
+  "yaml.validate": false,
+  "eslint.useFlatConfig": true,
+  "eslint.lintTask.enable": true,
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    },
+    {
+      "pattern": "apps/*"
+    },
+    {
+      "pattern": "packages/*"
+    }
+  ],
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ]
 }

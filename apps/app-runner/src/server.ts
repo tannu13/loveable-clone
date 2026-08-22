@@ -49,14 +49,16 @@ app.post("/start", (_req: Request, res: Response) => {
     },
   );
 
-  streamOutput(devServerProcess.stdout as ReadableStream<Uint8Array>, (text) =>
-    appendLog("dev", "stdout", text),
+  void streamOutput(
+    devServerProcess.stdout as ReadableStream<Uint8Array>,
+    (text) => appendLog("dev", "stdout", text),
   );
-  streamOutput(devServerProcess.stderr as ReadableStream<Uint8Array>, (text) =>
-    appendLog("dev", "stderr", text),
+  void streamOutput(
+    devServerProcess.stderr as ReadableStream<Uint8Array>,
+    (text) => appendLog("dev", "stderr", text),
   );
 
-  (async () => {
+  void (async () => {
     const process = devServerProcess;
     const exitCode = await process?.exited;
     lastDevExitCode = exitCode ?? null;
@@ -121,14 +123,16 @@ app.post("/restart", async (_req: Request, res: Response) => {
     },
   );
 
-  streamOutput(devServerProcess.stdout as ReadableStream<Uint8Array>, (text) =>
-    appendLog("dev", "stdout", text),
+  void streamOutput(
+    devServerProcess.stdout as ReadableStream<Uint8Array>,
+    (text) => appendLog("dev", "stdout", text),
   );
-  streamOutput(devServerProcess.stderr as ReadableStream<Uint8Array>, (text) =>
-    appendLog("dev", "stderr", text),
+  void streamOutput(
+    devServerProcess.stderr as ReadableStream<Uint8Array>,
+    (text) => appendLog("dev", "stderr", text),
   );
 
-  (async () => {
+  void (async () => {
     const process = devServerProcess;
     const exitCode = await process?.exited;
     lastDevExitCode = exitCode ?? null;

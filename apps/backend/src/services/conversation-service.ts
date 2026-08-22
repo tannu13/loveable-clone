@@ -10,13 +10,13 @@ import {
 import type { RedisClientType } from "redis";
 import type { K8Service } from "@repo/k8s";
 import {
+  getConversationHeartbeatName,
   getMessageToAgentQueueName,
   type TRedisMessageSchema,
 } from "@repo/shared";
 import { setSpanAttributes, withActiveSpan } from "@repo/observability";
 import { logger } from "../logger";
 import { toWireMessages } from "./message-history-mapper";
-import { getConversationHeartbeatName } from "../../../../packages/shared/src/helpers";
 
 const IDLE_TIMEOUT_MS = 120_000;
 export class ConversationService {
@@ -35,11 +35,11 @@ export class ConversationService {
   }
 
   async listConversations(userId: string) {
-    return await listConversationsForUser(userId);
+    return listConversationsForUser(userId);
   }
 
   async renameConversation(id: string, userId: string, title: string) {
-    return await renameConversation(id, userId, title);
+    return renameConversation(id, userId, title);
   }
 
   async deleteConversation(id: string, userId: string) {
@@ -47,8 +47,8 @@ export class ConversationService {
     // Best-effort infra cleanup, same fire-and-forget convention as
     // ensureInfrastructure in handleMessage — a k8s hiccup here shouldn't
     // block the (already-succeeded) delete response.
-    this.k8Service.teardownInfrastructure(id);
-    this.publisher.zRem(getConversationHeartbeatName(), id);
+    void this.k8Service.teardownInfrastructure(id);
+    void this.publisher.zRem(getConversationHeartbeatName(), id);
   }
 
   async getMessage(id: string, userId: string) {
@@ -86,11 +86,11 @@ export class ConversationService {
     conversationId = await withActiveSpan("message.save", async () => {
       logger.info("Saving conversation");
       return conversationId
-        ? await saveMessage(conversationId, userId, payload)
-        : await saveConversation({ ...payload, userId });
+        ? saveMessage(conversationId, userId, payload)
+        : saveConversation({ ...payload, userId });
     });
 
-    this.recordHeartbeat(conversationId, userId);
+    void this.recordHeartbeat(conversationId, userId);
 
     setSpanAttributes({
       "conversation.id": conversationId,
@@ -110,7 +110,7 @@ export class ConversationService {
       );
     });
 
-    this.k8Service.ensureInfrastructure(conversationId);
+    void this.k8Service.ensureInfrastructure(conversationId);
 
     return {
       conversationId,
